@@ -118,6 +118,16 @@ npm run test:live         # THEMIS_LIVE_SITES=chatgpt,claude limits the sites
 
 It uses a separate Chrome profile in `test-results/live-profile`, uses a little of each account's quota, and is not run in CI.
 
+**Whole-extension E2E against the real sites.** `e2e.live.cjs` loads Themis unpacked in Playwright's Chromium, creates a group chat in `team.html` through the real UI, adds one member per site, sends one `@all` prompt asking each member for its own token, and checks that each token comes back under the right member:
+
+```
+npx playwright-core install chromium   # once; branded Chrome ignores --load-extension
+npm run test:e2e:login                 # sign in to each site in the window that opens, then close it
+npm run test:e2e                       # THEMIS_E2E_SITES=chatgpt,gemini limits the sites
+```
+
+Each site is reported as PASS (a real reply reached the Themis UI), FAIL, or BLOCKED (a bot check or a missing sign-in stopped it). `test-results/e2e/` gets `summary.json`, `summary.md`, `team.png`, one screenshot per site frame, and the console errors. It runs headed on its own profile (`test-results/e2e-profile`), clears Themis's stored chats (not the site sign-ins) at the start of each run, exits non-zero unless every site passes, and is not run in CI.
+
 **Rebuilding the upstream base.** `npm run rebuild:upstream` builds OpenTeam v1.0.3 (commit `8ef6f37`) from its TypeScript source and lists which shipped files are identical to that build and which Themis changed. Today `assets/index-Cvqzct0I.js` and `assets/tiptapNoteEditor-DPZh58fM.js` are byte-identical; `background.js`, `content.js`, `team.js`, `team.html`, `team.css`, `manifest.json` and `assets/imageAttachmentRepository-DBrzc-g8.js` carry Themis's changes, which were made to the built files directly. The files Themis added (`composer-files.js`, `team-ui.js`, `localization.js`, `profile-avatars.js`, `team-refinements.css`) are plain, unminified source.
 
 - The browser UI tests drive Google Chrome through `playwright-core` and expect Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` (see `ui-fixture.cjs`). Change that path on macOS or Linux.
