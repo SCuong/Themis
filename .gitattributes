@@ -1,0 +1,5 @@
+# Same bytes on every OS, so builds hash the same everywhere.
+* text=auto eol=lf
+*.webp binary
+*.png binary
+*.docx binary
