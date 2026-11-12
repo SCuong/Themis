@@ -14,7 +14,7 @@ let instance = 0;
 // The service worker logs every step; keep test output readable.
 console.log = console.info = console.debug = console.warn = () => {};
 
-async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
+async function startThemis({ mode = 'collaborative', language = 'vi', roles, seed }) {
   const memory = {};
   const prompts = [];
   // Every other message sent to a member frame, and an optional per-type responder for it.
@@ -60,6 +60,7 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
     store.chatsById.chat.roleIds.push(role.id);
     role.frameId = index + 1;
   });
+  seed?.(store);
   await shared.F(store);
 
   instance += 1;

@@ -19,6 +19,15 @@
       "urlFilter": "||gemini.google.com/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   },
@@ -42,6 +51,15 @@
       "urlFilter": "||chatgpt.com/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   },
@@ -65,6 +83,15 @@
       "urlFilter": "||chat.openai.com/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   },
@@ -88,6 +115,15 @@
       "urlFilter": "||claude.ai/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   },
@@ -111,6 +147,15 @@
       "urlFilter": "||chat.deepseek.com/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   },
@@ -134,6 +179,15 @@
       "urlFilter": "||grok.com/",
       "resourceTypes": [
         "sub_frame"
+      ],
+      "initiatorDomains": [
+        "cnccbifloajlkjglmiojkpimjciamlpe",
+        "gemini.google.com",
+        "chatgpt.com",
+        "chat.openai.com",
+        "claude.ai",
+        "chat.deepseek.com",
+        "grok.com"
       ]
     }
   }
