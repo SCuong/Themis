@@ -23,7 +23,7 @@ export function createLogger(scope: string, baseContext: LogDetails = {}, option
     if (!shouldEmitVerbose()) return
 
     const payload = { ...baseContext, ...details }
-    console[level](`[OpenTeam][${scope}] ${event}`, payload)
+    console[level](`[Themis][${scope}] ${event}`, payload)
   }
 
   return {
@@ -39,10 +39,10 @@ function isDebugLoggingEnabled(): boolean {
   if (typeof __OPENTEAM_DEV__ !== 'undefined' && __OPENTEAM_DEV__) return true
 
   try {
-    const globalRecord = globalThis as unknown as { OPENTEAM_DEBUG?: boolean; localStorage?: Storage; location?: Location }
-    if (globalRecord.OPENTEAM_DEBUG === true) return true
-    if (globalRecord.localStorage?.getItem('openteam:debug') === 'true') return true
-    if (globalRecord.location?.search.includes('openteam_debug=1')) return true
+    const globalRecord = globalThis as unknown as { THEMIS_DEBUG?: boolean; localStorage?: Storage; location?: Location }
+    if (globalRecord.THEMIS_DEBUG === true) return true
+    if (globalRecord.localStorage?.getItem('themis:debug') === 'true') return true
+    if (globalRecord.location?.search.includes('themis_debug=1')) return true
   } catch {
     // Debug logging should never affect app behavior.
   }

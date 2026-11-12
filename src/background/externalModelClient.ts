@@ -10,11 +10,11 @@ export class ExternalModelError extends Error {
   }
 
   get friendlyMessage(): string {
-    if (this.status === 401 || this.status === 403) return 'API Key 无效或权限不足，请检查配置'
-    if (this.status === 429) return '请求过于频繁，请稍后再试 (Rate Limit)'
-    if (this.status === 404) return '模型名称不正确或端点路径错误'
-    if (this.status && this.status >= 500) return '模型服务器出现内部错误，请稍后重试'
-    if (this.message.includes('timeout') || this.message.includes('Network')) return '网络连接超时，请检查 BaseURL 和网络设置'
+    if (this.status === 401 || this.status === 403) return 'Invalid API Key or insufficient permissions. Please check the configuration'
+    if (this.status === 429) return 'Too many requests. Please try again later (Rate Limit)'
+    if (this.status === 404) return 'Incorrect model name or endpoint path'
+    if (this.status && this.status >= 500) return 'The model server encountered an internal error. Please try again later'
+    if (this.message.includes('timeout') || this.message.includes('Network')) return 'Network connection timed out. Please check BaseURL and network settings'
     return this.message
   }
 }
@@ -73,16 +73,16 @@ export function createExternalModelClient(fetchImpl: typeof fetch = fetch): Exte
         for await (const chunk of stream) content += chunk
         if (!content.trim()) {
           throw new ExternalModelError(
-            `外部模型返回内容为空 (URL: ${normalizedUrl}, Model: ${input.model.modelName}, Response: ${JSON.stringify(lastResponseMetadata)})`
+            `External model returned empty content (URL: ${normalizedUrl}, Model: ${input.model.modelName}, Response: ${JSON.stringify(lastResponseMetadata)})`
           )
         }
         return { content }
       } catch (error: any) {
         if (error.name === 'AbortError') {
-          throw new ExternalModelError('请求超时，模型响应时间过长', 408)
+          throw new ExternalModelError('Request timed out. The model took too long to respond', 408)
         }
         if (error instanceof ExternalModelError) throw error
-        throw new ExternalModelError(error.message || '未知外部模型错误')
+        throw new ExternalModelError(error.message || 'Unknown external model error')
       } finally {
         clearTimeout(timeoutId)
       }
@@ -104,7 +104,7 @@ async function* streamExternalModel(input: ExternalModelCompletionInput, fetchIm
           fetch: fetchImpl,
         })
         : createOpenAICompatible({
-          name: `openteam-${input.model.id}`,
+          name: `themis-${input.model.id}`,
           apiKey: input.model.apiKey,
           baseURL: normalizedUrl,
           fetch: fetchImpl,
@@ -127,7 +127,7 @@ async function* streamExternalModel(input: ExternalModelCompletionInput, fetchIm
 
       if (!isRetryable || attempt >= maxRetries) {
         throw new ExternalModelError(
-          error.message || '外部模型请求失败',
+          error.message || 'External model request failed',
           status,
           error.code
         )

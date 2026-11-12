@@ -3,7 +3,7 @@ import type { ContentLogger } from './runtimeClient'
 import type { RoleSession } from './roleSession'
 import type { ChatSiteAdapter } from './sites/types'
 
-const FRAME_ASSIGN_MESSAGE = 'OPENTEAM_ASSIGN_FRAME_ROLE'
+const FRAME_ASSIGN_MESSAGE = 'THEMIS_ASSIGN_FRAME_ROLE'
 
 export function registerFrameRoleHandshake(options: {
   siteAdapter: ChatSiteAdapter

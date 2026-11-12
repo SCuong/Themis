@@ -147,7 +147,7 @@ async function waitForGrokEditor(timeoutMs: number): Promise<HTMLElement> {
     await waitForNextGrokPoll()
   }
 
-  throw new Error('Grok 输入框暂不可用，请稍后重试')
+  throw new Error('Grok input is unavailable. Try again shortly.')
 }
 
 function findGrokEditor(): HTMLElement | undefined {
@@ -170,7 +170,7 @@ async function waitForGrokSendButton(editor: HTMLElement, timeoutMs: number): Pr
     await waitForNextGrokPoll()
   }
 
-  throw new Error('Grok 发送按钮暂不可用，请稍后重试')
+  throw new Error('Grok send button is unavailable. Try again shortly.')
 }
 
 function findGrokSendButton(editor: HTMLElement): HTMLElement | undefined {
@@ -201,7 +201,7 @@ function grokComposerScopes(editor: HTMLElement): Element[] {
 }
 
 function isUsableGrokSendButton(button: HTMLElement): boolean {
-  if (buttonLabelMatches(button, /voice|voice mode|microphone|dictation|attach|upload|camera|photo|image|file|model select|stop|停止|中止/i)) return false
+  if (buttonLabelMatches(button, /voice|voice mode|microphone|dictation|attach|upload|camera|photo|image|file|model select|stop/i)) return false
 
   if (button instanceof HTMLButtonElement) return isClickableButton(button) && isVisibleInteractiveElement(button)
   if (button.getAttribute('aria-disabled') === 'true') return false
@@ -293,7 +293,7 @@ async function stopGrokGenerating(): Promise<boolean> {
 }
 
 function findGrokStopButton(): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping|停止|中止/i) && isClickableButton(button) && isVisibleInteractiveElement(button))
+  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping/i) && isClickableButton(button) && isVisibleInteractiveElement(button))
 }
 
 function isVisibleInteractiveElement(element: Element): boolean {

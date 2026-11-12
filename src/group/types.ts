@@ -3,7 +3,7 @@ import type { MessageHighlightColor } from './highlightColors'
 
 export type RoomMode = 'independent' | 'collaborative'
 export type ChatSite = 'gemini' | 'chatgpt' | 'claude' | 'deepseek' | 'grok'
-export type OpenTeamLanguage = 'en' | 'zh-CN'
+export type OpenTeamLanguage = 'en' | 'vi'
 export type RoleModelSource = 'site' | 'external'
 export type ExternalModelFormat = 'openai' | 'anthropic'
 
@@ -37,6 +37,21 @@ export interface OpenTeamStore {
   externalChatMemoriesById?: Record<string, ExternalChatMemory>
   settings: OpenTeamSettings
   viewState?: OpenTeamViewState
+  // In memory only; saved under its own storage key (see CLEANUP_QUEUE_KEY).
+  otCleanupQueue?: CleanupTask[]
+}
+
+// Attachment deletion that still has to run after a chat or its messages were deleted.
+export interface CleanupTask {
+  id: string
+  kind: 'chat' | 'messages'
+  chatId: string
+  messageIds?: string[]
+  fileIds?: string[]
+  createdAt: number
+  attempts: number
+  lastError?: string
+  lastAttemptAt?: number
 }
 
 export interface OpenTeamViewState {
@@ -50,8 +65,6 @@ export interface OpenTeamSettings {
   defaultChatSite: ChatSite
   externalModelOrder: string[]
   externalModelsById: Record<string, ExternalModelConfig>
-  agentControlEnabled: boolean
-  agentControlPort: number
   language: OpenTeamLanguage
 }
 
@@ -256,8 +269,26 @@ export interface GroupRole {
   lastPromptMessageId?: string
   replyAttemptId?: string
   lastReplyAt?: number
+  // Persona and context last delivered to the current site conversation; unchanged ones are not resent.
+  promptSync?: RolePromptSync
+  promptSyncPending?: { messageId: string; signature: string }
+  frameConversationId?: string
   createdAt: number
   updatedAt: number
+}
+
+export interface RolePromptSync {
+  signature: string
+  conversationKey?: string
+}
+
+// A file attached in the composer. The bytes live in IndexedDB (themis.composerFiles) under id.
+export interface MessageFile {
+  id?: string
+  name: string
+  type: string
+  size: number
+  dataUrl?: string
 }
 
 export interface GroupMessage {
@@ -276,6 +307,7 @@ export interface GroupMessage {
   references?: MessageReference[]
   orchestrationRunId?: string
   orchestrationRound?: number
+  files?: MessageFile[]
   orchestrationStageId?: string
   orchestrationStageIndex?: number
   orchestrationKind?: 'task' | 'role' | 'review' | 'status'

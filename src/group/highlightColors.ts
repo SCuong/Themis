@@ -1,9 +1,9 @@
 export const MESSAGE_HIGHLIGHT_COLORS = [
-  { value: '#f8b84e', label: '琥珀', rgb: '248, 184, 78' },
-  { value: '#7dd3fc', label: '蓝色', rgb: '125, 211, 252' },
-  { value: '#86efac', label: '绿色', rgb: '134, 239, 172' },
-  { value: '#f9a8d4', label: '粉色', rgb: '249, 168, 212' },
-  { value: '#c4b5fd', label: '紫色', rgb: '196, 181, 253' },
+  { value: '#f8b84e', label: 'Amber', rgb: '248, 184, 78' },
+  { value: '#7dd3fc', label: 'Blue', rgb: '125, 211, 252' },
+  { value: '#86efac', label: 'Green', rgb: '134, 239, 172' },
+  { value: '#f9a8d4', label: 'Pink', rgb: '249, 168, 212' },
+  { value: '#c4b5fd', label: 'Purple', rgb: '196, 181, 253' },
 ] as const
 
 export type MessageHighlightColor = typeof MESSAGE_HIGHLIGHT_COLORS[number]['value']

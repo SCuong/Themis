@@ -32,7 +32,7 @@ export function getAvatarInitial(name: string | undefined, fallback = 'AI'): str
 }
 
 export function shouldConfirmMentionWithEnter(event: KeyboardShortcutEvent): boolean {
-  return event.key === 'Enter' && !event.isComposing && !event.shiftKey && !event.metaKey && !event.ctrlKey
+  return (event.key === 'Enter' || event.key === 'Tab') && !event.isComposing && !event.shiftKey && !event.metaKey && !event.ctrlKey
 }
 
 export function shouldSendMessageWithEnter(event: KeyboardShortcutEvent): boolean {
@@ -60,7 +60,7 @@ export function shouldAutoReconnectRole(role: Pick<GroupRole, 'modelSource' | 's
 }
 
 export function isUnavailableRolesError(message: string): boolean {
-  return message.includes('以下人员不可用，请等待或恢复') || message.includes('人员 iframe 尚未就绪')
+  return message.includes('The following agents are unavailable. Please wait or restore them.') || message.includes('Agent iframe is not ready yet')
 }
 
 export interface ChatStartupNotice {
@@ -72,8 +72,8 @@ export function getChatStartupNotice(chat: Pick<GroupChat, 'status'>, roles: Pic
   const hasStartingRole = roles.some(role => role.status === 'pending' || role.status === 'loading')
   if (chat.status !== 'initializing' && chat.status !== 'running' && !hasStartingRole) return undefined
   return {
-    title: '正在初始化角色',
-    body: '正在创建角色窗口，准备好后就可以继续对话。',
+    title: 'Initializing roles',
+    body: 'Creating role windows. You can continue once they are ready.',
   }
 }
 
@@ -87,10 +87,10 @@ export function formatChatListTime(timestamp: number, now = Date.now()): string 
   const dayDelta = Math.round((currentDay - targetDay) / 86_400_000)
 
   if (dayDelta === 0) {
-    return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(target)
+    return new Intl.DateTimeFormat('vi', { hour: '2-digit', minute: '2-digit', hour12: false }).format(target)
   }
-  if (dayDelta === 1) return '昨天'
-  if (dayDelta === 2) return '前天'
+  if (dayDelta === 1) return 'Yesterday'
+  if (dayDelta === 2) return 'The day before yesterday'
 
   const month = String(target.getMonth() + 1).padStart(2, '0')
   const day = String(target.getDate()).padStart(2, '0')
@@ -99,7 +99,7 @@ export function formatChatListTime(timestamp: number, now = Date.now()): string 
 }
 
 export function formatMessageTime(timestamp: number): string {
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat('vi', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

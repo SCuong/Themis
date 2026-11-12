@@ -32,11 +32,11 @@ export function createExternalModelHandlers(deps: ExternalModelHandlersDependenc
   }
 
   const handleUpdate = async (message: RuntimeMessage) => {
-    const modelId = requireString(message.modelId, '缺少外部模型 ID')
+    const modelId = requireString(message.modelId, 'Missing external model ID')
     const timestamp = deps.now()
     const { store, result } = await mutateStore(store => {
       const existing = store.settings.externalModelsById[modelId]
-      if (!existing) throw new Error(`找不到外部模型：${modelId}`)
+      if (!existing) throw new Error(`External model not found: ${modelId}`)
       const model = readExternalModelInput(message, modelId, existing.createdAt, timestamp)
       store.settings.externalModelsById[modelId] = model
       if (!store.settings.externalModelOrder.includes(modelId)) store.settings.externalModelOrder.push(modelId)
@@ -47,10 +47,10 @@ export function createExternalModelHandlers(deps: ExternalModelHandlersDependenc
   }
 
   const handleDelete = async (message: RuntimeMessage) => {
-    const modelId = requireString(message.modelId, '缺少外部模型 ID')
+    const modelId = requireString(message.modelId, 'Missing external model ID')
     const { store } = await mutateStore(store => {
       if (Object.values(store.rolesById).some(role => role.modelSource === 'external' && role.externalModelId === modelId)) {
-        throw new Error('外部模型正在被人员使用，不能删除')
+        throw new Error('The external model is in use by a member and cannot be deleted')
       }
       delete store.settings.externalModelsById[modelId]
       store.settings.externalModelOrder = store.settings.externalModelOrder.filter(id => id !== modelId)
@@ -60,14 +60,14 @@ export function createExternalModelHandlers(deps: ExternalModelHandlersDependenc
   }
 
   const handleTest = async (message: RuntimeMessage) => {
-    if (!deps.externalModelClient) throw new Error('外部模型测试客户端不可用')
-    const modelId = requireString(message.modelId, '缺少外部模型 ID')
+    if (!deps.externalModelClient) throw new Error('External model test client is unavailable')
+    const modelId = requireString(message.modelId, 'Missing external model ID')
     const store = await loadStore()
     const model = store.settings.externalModelsById[modelId]
-    if (!model) throw new Error(`找不到外部模型：${modelId}`)
+    if (!model) throw new Error(`External model not found: ${modelId}`)
     const completion = await deps.externalModelClient.complete({
       model,
-      prompt: '你是 OpenTeam 的外部模型连通性测试。请只回复 OK。',
+      prompt: 'You are an external model connectivity test for Themis. Reply only with OK.',
     })
     return { ok: true, content: completion.content }
   }
@@ -83,11 +83,11 @@ export function createExternalModelHandlers(deps: ExternalModelHandlersDependenc
 function readExternalModelInput(message: RuntimeMessage, id: string, createdAt: number, updatedAt: number): ExternalModelConfig {
   return {
     id,
-    name: requireString(message.name, '外部模型名称不能为空'),
+    name: requireString(message.name, 'External model name cannot be empty'),
     format: readExternalModelFormat(message.format),
-    baseUrl: requireString(message.baseUrl, '模型地址不能为空').replace(/\/+$/, ''),
-    apiKey: requireString(message.apiKey, '模型 Key 不能为空'),
-    modelName: requireString(message.modelName, '模型名称不能为空'),
+    baseUrl: requireString(message.baseUrl, 'Model URL cannot be empty').replace(/\/+$/, ''),
+    apiKey: requireString(message.apiKey, 'Model Key cannot be empty'),
+    modelName: requireString(message.modelName, 'Model name cannot be empty'),
     createdAt,
     updatedAt,
   }
@@ -95,7 +95,7 @@ function readExternalModelInput(message: RuntimeMessage, id: string, createdAt: 
 
 function readExternalModelFormat(value: unknown): ExternalModelFormat {
   if (value === 'openai' || value === 'anthropic') return value
-  throw new Error('外部模型格式必须是 OpenAI 或 Anthropic')
+  throw new Error('External model format must be OpenAI or Anthropic')
 }
 
 function requireString(value: unknown, error: string): string {

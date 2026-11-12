@@ -59,47 +59,47 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
     const thinking = getVisibleThinkingRoles(roles)
 
     if (!chat) {
-      deps.targetPreviewEl.textContent = '选择群聊后可发送'
+      deps.targetPreviewEl.textContent = 'Select a chat to send'
       deps.sendButtonEl.disabled = true
     } else if (roles.length === 0) {
-      deps.targetPreviewEl.textContent = '当前群聊还没有人员'
+      deps.targetPreviewEl.textContent = 'This chat has no people yet'
       deps.sendButtonEl.disabled = true
     } else if (!raw) {
       deps.targetPreviewEl.textContent = defaultMentionTargetForMessage('', chat) === 'all'
-        ? '输入消息；不 @ 会让所有成员回复，也可 @ 指定成员'
-        : '输入消息；不 @ 仅记录，@ 人员触发回复'
+        ? 'Type a message; without @ all members reply, or @ specific members'
+        : 'Type a message; without @ it is recorded only, while @people triggers replies'
       deps.sendButtonEl.disabled = true
     } else if (!parsed.ok) {
       deps.targetPreviewEl.textContent = parsed.error
       deps.sendButtonEl.disabled = true
     } else if (targets.length === 0) {
-      deps.targetPreviewEl.textContent = '将作为群消息记录，不触发 AI；@ 人员可触发回复'
+      deps.targetPreviewEl.textContent = 'This will be recorded as a chat message and will not trigger AI; @people can trigger replies'
       deps.sendButtonEl.disabled = false
     } else if (reconnecting.length > 0) {
       const readyTargets = targets.filter(role => !reconnecting.includes(role) && role.status === 'ready')
       deps.targetPreviewEl.textContent = readyTargets.length > 0
-        ? `将发送给：${readyTargets.map(roleDisplayName).join('、')}；正在连接：${reconnecting.map(roleDisplayName).join('、')}`
-        : `正在自动连接：${reconnecting.map(roleDisplayName).join('、')}`
+        ? `Will send to:${readyTargets.map(roleDisplayName).join(', ')}; Connecting:${reconnecting.map(roleDisplayName).join(', ')}`
+        : `Automatically connecting:${reconnecting.map(roleDisplayName).join(', ')}`
       deps.sendButtonEl.disabled = readyTargets.length === 0
     } else if (unavailable.length > 0) {
       const waiting = unavailable.filter(role => !shouldAutoReconnectRole(role))
       const readyTargets = targets.filter(role => role.status === 'ready')
       if (waiting.length > 0 && readyTargets.length === 0) {
-        deps.targetPreviewEl.textContent = `请稍等：${waiting.map(roleDisplayName).join('、')} 正在回复`
+        deps.targetPreviewEl.textContent = `Please wait:${waiting.map(roleDisplayName).join(', ')} is replying`
         deps.sendButtonEl.disabled = true
       } else if (waiting.length > 0) {
-        deps.targetPreviewEl.textContent = `将发送给：${readyTargets.map(roleDisplayName).join('、')}；跳过正在回复：${waiting.map(roleDisplayName).join('、')}`
+        deps.targetPreviewEl.textContent = `Will send to:${readyTargets.map(roleDisplayName).join(', ')}; Skipping agents already replying:${waiting.map(roleDisplayName).join(', ')}`
         deps.sendButtonEl.disabled = false
       } else {
-        deps.targetPreviewEl.textContent = `将先自动连接：${unavailable.map(roleDisplayName).join('、')}`
+        deps.targetPreviewEl.textContent = `Will automatically connect first:${unavailable.map(roleDisplayName).join(', ')}`
         deps.sendButtonEl.disabled = false
       }
     } else {
-      deps.targetPreviewEl.textContent = `将发送给：${targets.map(roleDisplayName).join('、')}`
+      deps.targetPreviewEl.textContent = `Will send to:${targets.map(roleDisplayName).join(', ')}`
       deps.sendButtonEl.disabled = false
     }
 
-    deps.busyPreviewEl.textContent = thinking.length > 0 ? `正在回复：${thinking.map(roleDisplayName).join('、')}` : ''
+    deps.busyPreviewEl.textContent = thinking.length > 0 ? `Replying: ${thinking.map(roleDisplayName).join(', ')}` : ''
   }
 
   function renderReferenceDraft(): void {
@@ -112,12 +112,12 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
     deps.referenceDraftEl.hidden = false
     const preview = document.createElement('div')
     preview.className = 'reference-draft-preview'
-    preview.textContent = `引用 ${deps.state.selectedReference.roleName || '人员'}：${deps.state.selectedReference.contentSnapshot}`
+    preview.textContent = `Quote ${deps.state.selectedReference.roleName || 'agents'}: ${deps.state.selectedReference.contentSnapshot}`
 
     const cancel = document.createElement('button')
     cancel.type = 'button'
     cancel.className = 'btn btn-ghost'
-    cancel.setAttribute('aria-label', '取消引用')
+    cancel.setAttribute('aria-label', 'Cancel quote')
     cancel.textContent = '×'
     cancel.addEventListener('click', () => {
       deps.state.selectedReference = undefined
@@ -128,8 +128,11 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
 
   function renderMentionPanel(): void {
     const roles = deps.getCurrentRoles()
-    const show = shouldShowMentionPanel(deps.messageInputEl.value) && roles.length > 0
+    const show = shouldShowMentionPanel(deps.messageInputEl.value) && roles.length > 0 && !deps.state.mentionDismissed
     const options = createMentionOptions(roles)
+    // team-ui.js reads these to highlight @mentions in the composer.
+    const labels = JSON.stringify(['all', 'Everyone', ...roles.flatMap(role => [roleDisplayName(role), role.name])])
+    if (deps.messageInputEl.dataset.mentionLabels !== labels) deps.messageInputEl.dataset.mentionLabels = labels
     deps.state.mentionIndex = clampMentionIndex(deps.state.mentionIndex, options)
     deps.mentionPanelEl.hidden = !show
     deps.mentionPanelEl.replaceChildren()
@@ -146,9 +149,9 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
       site.className = 'mention-site-badge'
       if (mentionOption.type === 'all') {
         avatar.className = 'mention-avatar mention-avatar-all'
-        avatar.textContent = '全'
-        name.textContent = '所有人'
-        site.textContent = '全员'
+        avatar.textContent = 'All'
+        name.textContent = 'Everyone'
+        site.textContent = 'All people'
         option.addEventListener('click', () => insertAllMention())
       } else {
         const role = mentionOption.role
@@ -173,13 +176,14 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
 
     deps.messageInputEl.addEventListener('input', () => {
       deps.state.mentionIndex = 0
+      deps.state.mentionDismissed = false
       renderComposerState()
     })
     deps.messageInputEl.addEventListener('keyup', () => renderComposerState())
     deps.messageInputEl.addEventListener('keydown', event => {
       const roles = deps.getCurrentRoles()
       const mentionOptions = createMentionOptions(roles)
-      const canHandleMention = roles.length > 0 && (shouldShowMentionPanel(deps.messageInputEl.value) || !deps.mentionPanelEl.hidden)
+      const canHandleMention = roles.length > 0 && !deps.mentionPanelEl.hidden
       if (canHandleMention) {
         deps.state.mentionIndex = clampMentionIndex(deps.state.mentionIndex, mentionOptions)
         if (event.key === 'ArrowDown') {
@@ -196,6 +200,8 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
           if (mentionOption?.type === 'all') insertAllMention()
           if (mentionOption?.type === 'role') insertMention(mentionOption.role)
         } else if (event.key === 'Escape') {
+          event.preventDefault()
+          deps.state.mentionDismissed = true
           deps.mentionPanelEl.hidden = true
         }
         return
@@ -222,14 +228,16 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
     const waitingRoles = targetResult.roles.filter(role => role.status === 'thinking' && !shouldAutoReconnectRole(role))
     const readyRoles = targetResult.roles.filter(role => role.status === 'ready')
     if (waitingRoles.length > 0 && readyRoles.length === 0) {
-      deps.showError(`请等待人员回复完成：${waitingRoles.map(roleDisplayName).join('、')}`)
+      deps.showError(`Wait for agents to finish replying:${waitingRoles.map(roleDisplayName).join(', ')}`)
       return
     }
 
     const reference = deps.state.selectedReference
     clearComposerAfterSend(raw, reference)
     try {
-      await runCommandWithReconnect(deps, { chat, roles: targetResult.roles, type: 'GROUP_MESSAGE_SEND', payload: { chatId: chat.id, raw, reference } })
+      // composer-files.js owns the attached files (globalThis.themisComposerFiles).
+      await runCommandWithReconnect(deps, { chat, roles: targetResult.roles, type: 'GROUP_MESSAGE_SEND', payload: { chatId: chat.id, raw, reference, files: globalThis.themisComposerFiles?.list() } })
+      globalThis.themisComposerFiles?.clear()
     } catch (error) {
       restoreComposerDraft(raw, reference)
       throw error
@@ -281,7 +289,7 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
   }
 
   function insertAllMention(): void {
-    insertMentionLabel('所有人')
+    insertMentionLabel('Everyone')
   }
 
   function insertMentionLabel(label: string): void {

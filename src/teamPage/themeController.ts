@@ -1,6 +1,6 @@
 export type TeamTheme = 'light' | 'dark'
 
-export const THEME_STORAGE_KEY = 'openteam.theme'
+export const THEME_STORAGE_KEY = 'themis.theme'
 
 export interface ThemeControllerDependencies {
   root: HTMLElement

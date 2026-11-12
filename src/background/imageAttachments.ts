@@ -57,16 +57,16 @@ export function createImageAttachmentService(deps: {
             redirect: 'follow',
             cache: 'no-store',
           })
-          if (!response.ok) throw new Error(`图片下载失败（HTTP ${response.status}）`)
+          if (!response.ok) throw new Error(`Image download failed (HTTP ${response.status})`)
           if (response.url) requireSafeOpenAiImageUrl(response.url)
 
           const mimeType = normalizeImageMimeType(response.headers.get('content-type'))
-          if (!mimeType) throw new Error('远端内容不是图片')
+          if (!mimeType) throw new Error('Remote content is not an image')
           const declaredSize = readContentLength(response.headers.get('content-length'))
-          if (declaredSize !== undefined && declaredSize > maxImageBytes) throw new Error('图片超过 25 MB 上限')
+          if (declaredSize !== undefined && declaredSize > maxImageBytes) throw new Error('Image exceeds the 25 MB limit')
 
           const blob = await response.blob()
-          if (blob.size > maxImageBytes) throw new Error('图片超过 25 MB 上限')
+          if (blob.size > maxImageBytes) throw new Error('Image exceeds the 25 MB limit')
           const normalizedBlob = blob.type === mimeType ? blob : blob.slice(0, blob.size, mimeType)
           const fileName = `chatgpt-image-${index + 1}.${extensionForMimeType(mimeType)}`
           const record: ImageAttachmentBlobRecord = {
@@ -121,13 +121,13 @@ function deduplicateImages(images: ReplyImageSource[]): ReplyImageSource[] {
 
 function requireSafeChatGptImageUrl(value: string): string {
   const url = parseHttpsUrl(value)
-  if (!url || !CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) throw new Error('不支持的图片来源')
+  if (!url || !CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) throw new Error('Unsupported image source')
   return url.href
 }
 
 function requireSafeOpenAiImageUrl(value: string): string {
   const url = parseHttpsUrl(value)
-  if (!url || !isOpenAiImageHost(url.hostname)) throw new Error('图片重定向到了不受信任的站点')
+  if (!url || !isOpenAiImageHost(url.hostname)) throw new Error('Image redirected to an untrusted site')
   return url.href
 }
 
@@ -183,9 +183,9 @@ function normalizeDimension(value: number | undefined): number | undefined {
 
 function safeCaptureError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
-  if (message === '不支持的图片来源' || message === '远端内容不是图片') return message
-  if (message.includes('25 MB')) return '图片超过 25 MB 上限'
+  if (message === 'Unsupported image source' || message === 'Remote content is not an image') return message
+  if (message.includes('25 MB')) return 'Image exceeds the 25 MB limit'
   if (message.includes('HTTP')) return message
-  if (message.includes('重定向')) return message
-  return '图片获取失败'
+  if (/redirect/i.test(message)) return message
+  return 'Failed to fetch image'
 }

@@ -1,3 +1,4 @@
+import { appendPersonaEditor } from '../../team-ui.js'
 import { roleMentionLabel, roleMentionLabelOptionsFromSettings } from '../group/mentionParser'
 import type { ChatSite, ExternalModelConfig, GroupRole, OpenTeamStore, RoleModelSource, RoleStatus } from '../group/types'
 import { normalizeLanguage, translateUi } from '../shared/i18n'
@@ -38,14 +39,14 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     const store = deps.getStore()
     const selectedRole = deps.state.selectedRoleId ? store.rolesById[deps.state.selectedRoleId] : undefined
     deps.rolePanelEl.classList.toggle('open', deps.state.peopleDrawerOpen)
-    deps.roleSummaryEl.textContent = ui(`${roles.length} 人员${selectedRole ? ` · 当前：${selectedRole.name}` : ''}`)
+    deps.roleSummaryEl.textContent = ui(`${roles.length} agents${selectedRole ? ` · Current: ${selectedRole.name}` : ''}`)
     renderRolePanelActions()
     deps.roleListEl.replaceChildren()
 
     if (!deps.getCurrentChat()) {
-      deps.roleListEl.append(deps.emptyCard(ui('未选择群聊'), ui('选择群聊后可添加、查看、恢复和唤醒人员。')))
+      deps.roleListEl.append(deps.emptyCard(ui('No chat selected'), ui('Select a chat to add, view, restore, and wake people.')))
     } else if (roles.length === 0) {
-      deps.roleListEl.append(deps.emptyCard(ui('暂无人员'), ui('点击添加人员，可从人员库批量加入或临时添加。')))
+      deps.roleListEl.append(deps.emptyCard(ui('No agents yet'), ui('Click Add people to add from the library or add a temporary person.')))
     } else {
       for (const role of roles) deps.roleListEl.append(roleCard(role))
     }
@@ -79,7 +80,7 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
 
     const description = document.createElement('div')
     description.className = 'role-description'
-    description.textContent = role.description || ui('未填写人员描述')
+    description.textContent = role.description || ui('No person description')
 
     const meta = document.createElement('div')
     meta.className = 'chat-row tiny role-meta'
@@ -98,7 +99,7 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     if (role.status === 'error') {
       const error = document.createElement('div')
       error.className = 'reference-box'
-      error.textContent = ui('人员异常。若目标站点未登录，请打开登录页后点击恢复人员。')
+      error.textContent = ui('Person error. If the target site is not signed in, open the login page and then click restore.')
       main.append(error)
     }
     return card
@@ -109,8 +110,8 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     button.type = 'button'
     button.className = 'role-prompt-detail'
     button.dataset.rolePromptDetail = role.id
-    button.setAttribute('aria-label', language() === 'en' ? `View ${role.name}'s prompt` : `查看 ${role.name} 的提示词`)
-    button.title = ui('查看提示词')
+    button.setAttribute('aria-label', language() === 'en' ? `View ${role.name}'s prompt` : `View ${role.name} 's prompt`)
+    button.title = ui('View prompt')
     button.append(promptDetailIcon())
     button.addEventListener('click', event => {
       event.stopPropagation()
@@ -143,22 +144,23 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     title.textContent = role.name
     const description = document.createElement('p')
     description.className = 'tiny'
-    description.textContent = role.description || ui('未填写人员描述')
+    description.textContent = role.description || ui('No person description')
     copy.append(title, description)
 
     const close = document.createElement('button')
     close.type = 'button'
     close.className = 'icon-btn modal-close role-prompt-close'
-    close.setAttribute('aria-label', ui('关闭提示词详情'))
+    close.setAttribute('aria-label', ui('Close prompt details'))
     close.textContent = '×'
     close.addEventListener('click', () => backdrop.remove())
     header.append(copy, close)
 
     const prompt = document.createElement('pre')
     prompt.className = 'template-prompt-preview'
-    prompt.textContent = role.systemPrompt?.trim() || ui('未填写提示词')
+    prompt.textContent = role.systemPrompt?.trim() || ui('No prompt provided')
 
-    modal.append(header, prompt)
+    // team-ui.js adds the header, the prompt and an inline persona editor for library people.
+    appendPersonaEditor(modal, header, prompt, role, deps.getStore(), deps.runCommand)
     backdrop.append(modal)
     document.body.append(backdrop)
     close.focus()
@@ -186,8 +188,8 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     button.type = 'button'
     button.className = 'role-refresh'
     button.dataset.roleRefresh = role.id
-    button.setAttribute('aria-label', language() === 'en' ? `Refresh ${role.name}'s member window` : `刷新 ${role.name} 的成员窗口`)
-    button.title = role.modelSource === 'external' ? ui('API 成员无需刷新窗口') : ui('刷新成员窗口')
+    button.setAttribute('aria-label', language() === 'en' ? `Refresh ${role.name}'s member window` : `Refresh ${role.name} 's member window`)
+    button.title = role.modelSource === 'external' ? ui('API members do not need a window refresh') : ui('Refresh member window')
     button.textContent = '↻'
     if (role.modelSource === 'external') button.disabled = true
     button.addEventListener('click', event => {
@@ -204,8 +206,8 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'role-jump'
-    button.setAttribute('aria-label', language() === 'en' ? `Jump to ${role.name}'s source window` : `跳转到 ${role.name} 的原始窗口`)
-    button.title = ui('跳转到原始窗口')
+    button.setAttribute('aria-label', language() === 'en' ? `Jump to ${role.name}'s source window` : `Go to ${role.name} 's original window`)
+    button.title = ui('Jump to source window')
     button.textContent = '↗'
     button.addEventListener('click', event => {
       event.stopPropagation()
@@ -219,8 +221,8 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
     button.type = 'button'
     button.className = 'role-delete'
     button.dataset.roleDelete = role.id
-    button.setAttribute('aria-label', language() === 'en' ? `Delete ${role.name}` : `删除 ${role.name}`)
-    button.title = ui('删除成员')
+    button.setAttribute('aria-label', language() === 'en' ? `Delete ${role.name}` : `Delete ${role.name}`)
+    button.title = ui('Delete member')
     button.append(trashIcon())
     button.addEventListener('click', event => {
       event.stopPropagation()
@@ -275,7 +277,7 @@ export function createRolePanelView(deps: RolePanelViewDependencies): RolePanelV
   }
 
   async function kickRoleFromChat(role: GroupRole): Promise<void> {
-    if (!window.confirm(`确定将「${role.name}」移出当前群聊吗？历史聊天记录会保留。`)) {
+    if (!window.confirm(`Remove “${role.name}” from this group chat? Chat history will be kept.`)) {
       renderRolePanel()
       return
     }
@@ -372,7 +374,7 @@ function selectableModels(store: OpenTeamStore): Array<{ key: string; label: str
 
 function roleModelOption(role: GroupRole, store: OpenTeamStore): { key: string; label: string; className: string } {
   const key = roleModelKey(role, store)
-  return selectableModels(store).find(model => model.key === key) ?? { key, label: 'API · 未配置', className: 'site-pill-external' }
+  return selectableModels(store).find(model => model.key === key) ?? { key, label: 'API · Not configured', className: 'site-pill-external' }
 }
 
 function roleModelKey(role: Pick<GroupRole, 'modelSource' | 'externalModelId' | 'chatSite'>, store: OpenTeamStore): string {
@@ -414,25 +416,25 @@ function statusPill(status: string, label: string): HTMLElement {
 function roleContextProgress(role: GroupRole, ui: (source: string) => string): HTMLElement {
   const progress = document.createElement('span')
   progress.className = 'role-meta-item'
-  progress.textContent = ui(role.contextCursor > 0 ? `已读 ${role.contextCursor} 条` : '尚未读取消息')
+  progress.textContent = ui(role.contextCursor > 0 ? `Read ${role.contextCursor} ${role.contextCursor === 1 ? 'message' : 'messages'}` : 'No messages read yet')
   return progress
 }
 
 function roleConnectionStatus(role: GroupRole, ui: (source: string) => string): HTMLElement {
   const status = document.createElement('span')
   status.className = 'role-meta-item'
-  status.textContent = ui(role.modelSource === 'external' ? '连接 API' : role.geminiConversationUrl ? '网页已连接' : '等待连接')
+  status.textContent = ui(role.modelSource === 'external' ? 'API connected' : role.geminiConversationUrl ? 'Web connected' : 'Waiting to connect')
   return status
 }
 
 function roleStatusLabel(status: RoleStatus): string {
   const labels: Record<RoleStatus, string> = {
-    pending: '待唤醒',
-    loading: '加载中',
-    ready: '在线',
-    thinking: '回复中',
-    stopped: '已停止',
-    error: '异常',
+    pending: 'Pending',
+    loading: 'Loading',
+    ready: 'Online',
+    thinking: 'Replying',
+    stopped: 'Stopped',
+    error: 'Error',
   }
   return labels[status]
 }

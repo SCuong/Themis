@@ -34,7 +34,7 @@ export function defaultMentionTargetForMessage(raw: string, chat: Pick<GroupChat
 
 export function parseGroupMentions(raw: string, roles: GroupRole[], options: ParseGroupMentionsOptions = {}): ParsedGroupMention {
   const trimmed = raw.trim()
-  if (!trimmed) return { ok: false, error: '消息内容不能为空' }
+  if (!trimmed) return { ok: false, error: 'Enter a message' }
 
   const allRoleIds = roles.map(role => role.id)
   if (!trimmed.includes('@')) {
@@ -65,7 +65,7 @@ export function parseGroupMentions(raw: string, roles: GroupRole[], options: Par
       continue
     }
 
-    const allMentionLabel = ['all', '所有人'].find(label => mentionMatches(trimmed, index, label))
+    const allMentionLabel = ['all', 'Everyone'].find(label => mentionMatches(trimmed, index, label))
     if (allMentionLabel) {
       targetsAll = true
       index += allMentionLabel.length + 1
@@ -84,7 +84,7 @@ export function parseGroupMentions(raw: string, roles: GroupRole[], options: Par
   }
 
   const parsedContent = compactContent(content)
-  if (!parsedContent) return { ok: false, error: '消息内容不能为空' }
+  if (!parsedContent) return { ok: false, error: 'Enter a message' }
 
   return {
     ok: true,
@@ -97,7 +97,7 @@ export function parseGroupMentions(raw: string, roles: GroupRole[], options: Par
 }
 
 export function roleMentionLabel(role: GroupRole, options: RoleMentionLabelOptions = {}): string {
-  return `${role.name}（${roleModelLabel(role, options)}）`
+  return `${role.name}(${roleModelLabel(role, options)})`
 }
 
 export function roleModelLabel(role: GroupRole, options: RoleMentionLabelOptions = {}): string {
@@ -130,12 +130,12 @@ function mentionMatches(raw: string, atIndex: number, target: string): boolean {
 }
 
 function readOrchestrationMention(raw: string, atIndex: number): { target: OrchestrationMentionTarget; nextIndex: number } | undefined {
-  for (const label of ['编排', 'orchestration']) {
+  for (const label of ['Orchestration', 'orchestration']) {
     if (!raw.startsWith(`@${label}`, atIndex)) continue
     const nextIndex = atIndex + label.length + 1
     const afterLabel = raw.slice(nextIndex)
-    if (afterLabel.startsWith(':') || afterLabel.startsWith('：')) {
-      const name = afterLabel.slice(1).match(/^([^\s，。！？,.!?;；:：]+)/)?.[1]
+    if (afterLabel.startsWith(':') || afterLabel.startsWith(':')) {
+      const name = afterLabel.slice(1).match(/^([^\s,.!?;:]+)/)?.[1]
       if (!name) return undefined
       return { target: { name }, nextIndex: nextIndex + 1 + name.length }
     }
@@ -145,7 +145,7 @@ function readOrchestrationMention(raw: string, atIndex: number): { target: Orche
 }
 
 function isMentionBoundary(value: string): boolean {
-  return /\s|[，。！？,.!?;；:：]/.test(value)
+  return /\s|[,.!?;:]/.test(value)
 }
 
 function defaultTargetRoleIds(allRoleIds: string[], options: ParseGroupMentionsOptions): string[] {

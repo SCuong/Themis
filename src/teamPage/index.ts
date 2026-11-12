@@ -25,7 +25,7 @@ import { createErrorPresenter, createSuccessPresenter, teamPageLog } from './tea
 import { createThemeController } from './themeController'
 import { createTeamUiController } from './teamUiController'
 import { emptyCard, getChatRecentSummary as getStoreChatRecentSummary, messageTitle, roleAvatarLabel, roleToneClass } from './viewHelpers'
-import { agentControlStatusState, agentControlStatusText } from './agentControlStatusView'
+import { initializeTeamUI } from '../../team-ui.js'
 import { createIndexedDbImageAttachmentRepository } from '../shared/imageAttachmentRepository'
 
 const appState = createTeamPageState()
@@ -34,10 +34,10 @@ const imageAttachmentRepository = createIndexedDbImageAttachmentRepository()
 let store: OpenTeamStore = appState.store
 
 const teamDomRefs = createTeamPageDomRefs()
-const { appShellEl, closeWindowEl, toggleWindowSizeEl, toggleFullscreenEl, storeSummaryEl, chatListEl, chatTitleEl, chatSubtitleEl, chatStatusEl, messagesEl } = teamDomRefs
+const { appShellEl, toggleWindowSizeEl, toggleFullscreenEl, storeSummaryEl, chatListEl, chatTitleEl, chatSubtitleEl, chatStatusEl, messagesEl } = teamDomRefs
 const { roleSummaryEl, roleListEl, roleTemplateSelectEl, templateListEl, targetPreviewEl, busyPreviewEl, composerFormEl, sendButtonEl } = teamDomRefs
 const { messageInputEl, referenceDraftEl, mentionPanelEl, errorEl, newChatNameEl, createChatFormEl, quickCreateChatEl } = teamDomRefs
-const { templateNameEl, templateDescriptionEl, templatePromptEl, templateAiDescriptionEl, generateTemplatePersonaEl, templatePersonaGenerationStatusEl, templateFormTitleEl, settingsButtonEl, settingsMenuEl, languageEnEl, languageZhEl, agentControlToggleEl, agentControlStatusEl, themeLightEl, themeDarkEl } = teamDomRefs
+const { templateNameEl, templateDescriptionEl, templatePromptEl, templateAiDescriptionEl, generateTemplatePersonaEl, templatePersonaGenerationStatusEl, templateFormTitleEl, settingsButtonEl, settingsMenuEl, languageEnEl, languageViEl, themeLightEl, themeDarkEl } = teamDomRefs
 const { openAllNotesEl, closeAllNotesEl, allNotesModalEl, allNotesListEl, allNotesActiveTitleEl, allNotesActiveMetaEl, allNotesEditorEl } = teamDomRefs
 const { allNoteBoldEl, allNoteItalicEl, allNoteStrikeEl, allNoteBulletListEl, allNoteOrderedListEl, allNoteUndoEl, allNoteRedoEl } = teamDomRefs
 const { openPeopleLibraryEl, openExternalModelsEl, openOrchestrationEl, closeOrchestrationEl, orchestrationModalEl, orchestrationAutoModalEl, orchestrationTaskEl, autoOrchestrationEl, openOrchestrationTemplateEl, orchestrationTemplateModalEl, closeOrchestrationTemplateEl, orchestrationTemplateContentEl, closeAutoOrchestrationEl, orchestrationAutoContentEl, orchestrationPeopleListEl, arrangeOrchestrationEl, orchestrationCanvasEl, orchestrationHintEl, orchestrationStageSettingsEl, orchestrationReviewSettingsEl, orchestrationMaxRoundsEl, saveOrchestrationEl, runOrchestrationEl, closeExternalModelsEl, externalModelsModalEl, externalModelsListEl, externalModelFormEl, externalModelIdEl, externalModelNameEl, externalModelFormatEl, externalModelBaseUrlEl, externalModelApiKeyEl, externalModelModelNameEl, resetExternalModelFormEl, closePeopleLibraryEl, peopleLibraryModalEl, personTemplateModalEl, addPersonModalEl, temporaryPersonModalEl } = teamDomRefs
@@ -81,7 +81,7 @@ const sendRuntimeMessage = runtimeClient.sendRuntimeMessage
 const runCommand = runtimeClient.runCommand
 const languageSettingsController = createLanguageSettingsController({
   englishButton: languageEnEl,
-  chineseButton: languageZhEl,
+  vietnameseButton: languageViEl,
   getLanguage: () => store.settings.language,
   runCommand,
   showError,
@@ -89,14 +89,14 @@ const languageSettingsController = createLanguageSettingsController({
 languageSettingsController.render()
 async function generatePersona(description: string): Promise<GeneratedPersonDraft> {
   const response = await sendRuntimeMessage('ROLE_TEMPLATE_PERSONA_GENERATE', { description }) as Awaited<ReturnType<typeof sendRuntimeMessage>> & { persona?: GeneratedPersonDraft }
-  if (response.ok === false) throw new Error(response.error || 'AI 生成人设失败')
-  if (!response.persona) throw new Error('AI 生成人设返回格式无效')
+  if (response.ok === false) throw new Error(response.error || 'AI persona generation failed')
+  if (!response.persona) throw new Error('AI persona generation returned an invalid format')
   return response.persona
 }
 
 async function testExternalModel(modelId: string): Promise<void> {
   const response = await sendRuntimeMessage('EXTERNAL_MODEL_TEST', { modelId })
-  if (response.ok === false) throw new Error(response.error || '外部模型测试失败')
+  if (response.ok === false) throw new Error(response.error || 'External model test failed')
 }
 
 let renderComposerState = (): void => {}
@@ -104,7 +104,6 @@ let insertMention = (_role: GroupRole): void => {}
 let insertTextIntoActiveNote = (_text: string): void => {}
 const floatingWindowControls = createFloatingWindowControls({
   appShellEl,
-  closeWindowEl,
   toggleWindowSizeEl,
   toggleFullscreenEl,
   windowLauncherEl,
@@ -187,6 +186,7 @@ const chatListView = createChatListView({
   runCommand,
   log,
   showError,
+  showSuccess,
 })
 const renderChatList = chatListView.renderChatList
 const switchChat = chatListView.switchChat
@@ -466,8 +466,7 @@ async function resolveHostTabId(): Promise<void> {
 async function refreshStore(showFailure = true): Promise<void> {
   try {
     const response = await sendRuntimeMessage('GROUP_STORE_GET')
-    if (response.ok === false) throw new Error(response.error || '读取群聊数据失败')
-    if (response.controlStatus) appState.controlStatus = response.controlStatus
+    if (response.ok === false) throw new Error(response.error || 'Failed to read group chat data')
     applyStore(response.store ?? createDefaultStore())
   } catch (error) {
     applyStore(createDefaultStore())
@@ -538,34 +537,17 @@ function handlePrimaryModeChange(isPrimary: boolean): void {
   }
 
   log.warn('team-page-primary:passive', { hostTabId: appState.hostTabId })
-  showError('已检测到另一个 OpenTeam 页面正在运行。当前页面已暂停 AI iframe，避免两个页面同时加载导致卡死。')
+  showError('Another Themis page is running. AI iframes on this page have been paused to prevent freezing when both pages load simultaneously.')
 }
 
 function render(): void {
   renderSelectedChat()
   renderTemplates()
-  renderAgentControlSettings()
   if (!externalModelsModalEl.hidden) renderExternalModels()
   if (!orchestrationModalEl.hidden) renderOrchestrationModal()
   renderAddPersonDialog()
   if (!allNotesModalEl.hidden) renderAllNotes()
   languageSettingsController.render()
-}
-
-function renderAgentControlSettings(): void {
-  const enabled = store.settings.agentControlEnabled
-  agentControlToggleEl.setAttribute('aria-pressed', String(enabled))
-  agentControlToggleEl.textContent = `本机智能体控制：${enabled ? '开启' : '关闭'}`
-  agentControlStatusEl.dataset.controlState = agentControlStatusState(store, appState.controlStatus)
-  agentControlStatusEl.textContent = agentControlStatusText(store, appState.controlStatus)
-}
-
-function registerAgentControlSettings(): void {
-  agentControlToggleEl.addEventListener('click', () => {
-    runCommand('GROUP_SETTINGS_UPDATE', {
-      agentControlEnabled: !store.settings.agentControlEnabled,
-    }).catch(error => showError(error instanceof Error ? error.message : String(error)))
-  })
 }
 
 function renderSelectedChat(): void {
@@ -583,12 +565,6 @@ function registerRuntimePush(): void {
     if (message.type === 'GROUP_ROLE_RECOVERY_REQUEST') {
       handleRoleRecoveryRequest(message, sendResponse)
       return true
-    }
-    if (message.type === 'GROUP_CONTROL_STATUS_UPDATED') {
-      appState.controlStatus = message.controlStatus
-      renderAgentControlSettings()
-      languageSettingsController.render()
-      return false
     }
     if (orchestrationModalView.handleRuntimeMessage(message)) return false
     if (message.type === 'TEAM_FRAME_ROLE_READY') iframeHost.markRoleReady(message.chatId, message.roleId)
@@ -617,7 +593,7 @@ function handleRoleRecoveryRequest(message: Extract<StorePushMessage, { type: 'G
       hasRole: Boolean(role),
       roleChatId: role?.chatId,
     })
-    sendResponse({ ok: false, error: '找不到要恢复的人员' })
+    sendResponse({ ok: false, error: 'Could not find the agent to restore' })
     return
   }
   log.warn('orchestration-diagnostic:role-recovery:start', {
@@ -653,7 +629,6 @@ async function boot(): Promise<void> {
   registerFloatingWindowControls()
   registerAllNotesEvents()
   languageSettingsController.registerEvents()
-  registerAgentControlSettings()
   registerUi()
   registerOrchestrationEvents()
   registerNotesEvents()
@@ -662,3 +637,5 @@ async function boot(): Promise<void> {
 }
 
 boot().catch(error => showError(error instanceof Error ? error.message : String(error)))
+// Themis interface layer (team-ui.js): localization, sidebar, keyboard handling.
+initializeTeamUI()

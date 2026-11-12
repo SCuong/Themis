@@ -1,5 +1,7 @@
 import type { BackgroundToRoleMessage, RoleToBackgroundMessage } from '../group/runtimeProtocol'
+import { attachFiles } from './attachFiles'
 import { createConversationMonitor, type ConversationMonitor } from './conversationMonitor'
+import { deleteConversation } from './deleteConversation'
 import { registerFrameRoleHandshake } from './frameHandshake'
 import { isDirectEmbeddedFrame, isEmbeddedFrame } from './frameEnvironment'
 import { waitBeforePromptInput, PROMPT_INPUT_DELAY_MS } from './promptDelay'
@@ -11,7 +13,7 @@ import { createRoleSession } from './roleSession'
 import { getActiveChatSiteAdapter } from './sites'
 import type { SiteStatusInfo } from './sites/types'
 
-const OPEN_TEAM_LOADED_KEY = '__OPENTEAM_LOADED__'
+const OPEN_TEAM_LOADED_KEY = '__THEMIS_LOADED__'
 
 const siteAdapter = getActiveChatSiteAdapter()
 
@@ -127,6 +129,13 @@ function registerMessageHandlers(): void {
       return true
     }
 
+    if (message?.type === 'TEAM_DELETE_CONVERSATION') {
+      deleteConversation(message.conversationId, siteAdapter.id, log).then(sendResponse, error =>
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      )
+      return true
+    }
+
     if (message?.type === 'TEAM_STOP_GENERATION') {
       handleStopGenerationMessage(message, sendResponse)
       return true
@@ -203,7 +212,7 @@ function handleStopGenerationMessage(message: Extract<BackgroundToRoleMessage, {
     ((message.messageId && activePrompt.messageId !== message.messageId) ||
       (message.replyAttemptId && activePrompt.replyAttemptId && activePrompt.replyAttemptId !== message.replyAttemptId))
   ) {
-    sendResponse({ ok: false, error: '当前回复已经切换，停止请求已过期' })
+    sendResponse({ ok: false, error: 'This stop request expired because the active reply changed' })
     return
   }
 
@@ -211,7 +220,7 @@ function handleStopGenerationMessage(message: Extract<BackgroundToRoleMessage, {
     .stopGenerating()
     .then(stopped => {
       if (!stopped) {
-        sendResponse({ ok: false, error: '当前页面没有可点击的停止按钮' })
+        sendResponse({ ok: false, error: 'No available stop button was found' })
         return
       }
 
@@ -269,6 +278,7 @@ function handleSendPromptMessage(message: Extract<BackgroundToRoleMessage, { typ
       log.info('message:send-prompt:delay-before-input', { messageId: message.messageId, delayMs: PROMPT_INPUT_DELAY_MS })
       return waitBeforePromptInput()
     })
+    .then(() => attachFiles(message.files, siteAdapter.id, log))
     .then(() => fillAndSend(message.content, message.autoSend !== false))
     .then(() => {
       conversationMonitor?.reportConversationUpdate()

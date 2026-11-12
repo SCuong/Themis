@@ -66,7 +66,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ChatSit
 
     if (!autoSend) return
 
-    const sendButton = await waitForClickableButton(CLAUDE_SELECTORS.sendButton, inputTimeoutMs, 'Claude 发送按钮暂不可用，请稍后重试')
+    const sendButton = await waitForClickableButton(CLAUDE_SELECTORS.sendButton, inputTimeoutMs, 'Claude send button is unavailable. Try again shortly.')
     sendButton.click()
   }
 
@@ -163,7 +163,7 @@ async function stopClaudeGenerating(): Promise<boolean> {
 }
 
 function findClaudeStopButton(): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping|停止|中止/) && isClickableButton(button))
+  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping/) && isClickableButton(button))
 }
 
 function checkClaudeStatus(): SiteStatusInfo {

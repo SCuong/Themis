@@ -1,4 +1,6 @@
 import { extractSupportedConversationId, normalizeSupportedChatConversationUrl } from '../group/conversationUrl'
+import { readMessageFiles, filesAsPromptText } from './messageFiles'
+import { syncConversation, type ConversationChangeSource } from './promptSync'
 import { normalizeMessageHighlightColor } from '../group/highlightColors'
 import { defaultMentionTargetForMessage, parseGroupMentions, roleMentionLabelOptionsFromSettings } from '../group/mentionParser'
 import { mapRuntimeRoleStatus } from '../group/runtimeProtocol'
@@ -75,9 +77,10 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   const roleErrorRetryCounts = new Map<string, number>()
 
   const handleMessageSend = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const raw = requireString(message.raw, '消息内容不能为空')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const raw = requireString(message.raw, 'Message content cannot be empty')
     const timestamp = deps.now()
+    const files = readMessageFiles(message.files)
     deps.log.info('message-send:start', { chatId, rawLength: raw.length })
 
     const { store, result } = await mutateStore(store => {
@@ -112,7 +115,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
             binding: isExternalModelRole(role) ? undefined : deps.runtimeFrames.getByRole(chat.id, role.id),
           })),
         })
-        throw new Error(`以下人员不可用，请等待或恢复：${unavailable.map(role => role.name).join('、')}`)
+        throw new Error(`The following members are unavailable. Please wait or restore them: ${unavailable.map(role => role.name).join(', ')}`)
       }
       if (unavailable.length > 0) {
         deps.log.warn('message-send:partial-unavailable-targets', {
@@ -142,6 +145,8 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         mentionedRoleIds: parsed.mentionedRoleIds,
         mentionsAll: parsed.mentionsAll,
         references: reference ? [reference] : undefined,
+        // The message keeps only the file details; the bytes stay in the team page's IndexedDB.
+        ...(files.length ? { files: files.map(({ name, type, size, id }) => ({ name, type, size, ...(id ? { id } : {}) })) } : {}),
         createdAt: timestamp,
         status: finalTargetRoleIds.length > 0 ? 'pending' : 'received',
         deliveryStatus: Object.fromEntries(finalTargetRoleIds.map(roleId => [roleId, unavailable.some(role => role.id === roleId) ? 'error' : 'pending'])),
@@ -173,7 +178,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
             messageId: userMessage.id,
             conversationUrlPresent: Boolean(role.geminiConversationUrl),
             contextCursor: role.contextCursor,
-            roleHistoryCount: prepared.roleHistoryCount,
+            promptSync: role.promptSync,
             personaLength: readPersonaLength(role),
           })
         }
@@ -202,6 +207,11 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         ...result.externalDeliveries.map(delivery => ({ roleId: delivery.roleId, modelSource: 'external', modelId: delivery.model.id, contentLength: delivery.prompt.length })),
       ],
     })
+    if (files.length) {
+      for (const delivery of result.deliveries) delivery.message.files = files
+      const fileText = filesAsPromptText(files)
+      for (const delivery of result.externalDeliveries) delivery.prompt += fileText
+    }
     await deps.broadcastStoreUpdated(store)
 
     await sendPromptDeliveries(deps, chatId, result.message.id, result.deliveries)
@@ -222,8 +232,8 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   }
 
   const handleRoleRetryReply = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
     const timestamp = deps.now()
     let discardedAttachmentIds: string[] = []
 
@@ -233,7 +243,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       const requestedMessageId = readOptionalString(message.messageId)
       const retryTarget = resolveRetryTarget(store, chat, role, requestedMessageId, deps.log)
       const userMessage = retryTarget?.userMessage
-      if (!userMessage) throw new Error(requestedMessageId ? '该消息没有发送给这个人员' : '找不到可重试的用户消息')
+      if (!userMessage) throw new Error(requestedMessageId ? 'This message was not sent to this member' : 'No user message available to retry')
       if (retryTarget?.discardMessageId) {
         discardedAttachmentIds = readyAttachmentIds(store.messagesById[retryTarget.discardMessageId]?.attachments)
         discardMessage(store, chat, retryTarget.discardMessageId)
@@ -271,7 +281,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       return { ok: true, store: responseStore, messageId: externalDelivery.messageId }
     }
     const delivery = 'delivery' in result ? result.delivery : undefined
-    if (!delivery) throw new Error('重试投递生成失败')
+    if (!delivery) throw new Error('Failed to generate the retry dispatch')
     deps.log.info('role-retry-reply:deliver', {
       chatId,
       roleId,
@@ -285,13 +295,13 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   }
 
   const handleRoleStopReply = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
 
     const { result: active } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const role = requireRole(store, chat.id, roleId)
-      if (role.status !== 'thinking' || !role.lastPromptMessageId) throw new Error('该人员当前没有正在回复的任务')
+      if (role.status !== 'thinking' || !role.lastPromptMessageId) throw new Error('This member is not currently responding to a task')
       return {
         messageId: role.lastPromptMessageId,
         replyAttemptId: role.replyAttemptId,
@@ -303,7 +313,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       externalModelRuns.abort(chatId, roleId, active.replyAttemptId)
     } else {
       const binding = deps.runtimeFrames.getByRole(chatId, roleId)
-      if (!binding?.ready) throw new Error('人员 iframe 尚未就绪，无法停止回复')
+      if (!binding?.ready) throw new Error('The member iframe is not ready; cannot stop the response')
       const response = await deps.sendRoleMessage(binding.tabId, binding.frameId, {
         type: 'TEAM_STOP_GENERATION',
         chatId,
@@ -311,7 +321,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         messageId: active.messageId,
         replyAttemptId: active.replyAttemptId,
       })
-      if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? '停止回复失败')
+      if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? 'Failed to stop the response')
     }
 
     const timestamp = deps.now()
@@ -335,7 +345,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleNoteSave = async (message: RuntimeMessage) => {
     const scope = readOptionalString(message.scope)
-    if (scope !== 'global' && scope !== 'chat') throw new Error('未知笔记范围')
+    if (scope !== 'global' && scope !== 'chat') throw new Error('Unknown note scope')
     const content = requireNoteContent(message.content)
 
     const { store } = await mutateStore(store => {
@@ -344,7 +354,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         return
       }
 
-      const chatId = requireString(message.chatId, '缺少群聊 ID')
+      const chatId = requireString(message.chatId, 'Missing group chat ID')
       requireChat(store, chatId)
       store.chatNotesById ??= {}
       store.chatNotesById[chatId] = content
@@ -354,20 +364,20 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   }
 
   const handleMessageHighlightCreate = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const messageId = requireString(message.messageId, '缺少消息 ID')
-    const text = requireString(message.text, '高亮内容不能为空')
-    const startOffset = requireNumber(message.startOffset, '缺少高亮起点')
-    const endOffset = requireNumber(message.endOffset, '缺少高亮终点')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const messageId = requireString(message.messageId, 'Missing message ID')
+    const text = requireString(message.text, 'Highlight content cannot be empty')
+    const startOffset = requireNumber(message.startOffset, 'Missing highlight start position')
+    const endOffset = requireNumber(message.endOffset, 'Missing highlight end position')
     const color = normalizeMessageHighlightColor(message.color)
-    if (endOffset <= startOffset) throw new Error('高亮范围无效')
+    if (endOffset <= startOffset) throw new Error('Invalid highlight range')
     const timestamp = deps.now()
 
     const { store } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const target = store.messagesById[messageId]
-      if (!target || target.chatId !== chat.id) throw new Error('找不到消息')
-      if (startOffset < 0 || endOffset > target.content.length || target.content.slice(startOffset, endOffset) !== text) throw new Error('高亮范围与消息内容不匹配')
+      if (!target || target.chatId !== chat.id) throw new Error('Message not found')
+      if (startOffset < 0 || endOffset > target.content.length || target.content.slice(startOffset, endOffset) !== text) throw new Error('The highlight range does not match the message content')
 
       store.messageHighlightsById ??= {}
       store.messageHighlightsById[messageId] ??= []
@@ -386,17 +396,17 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   }
 
   const handleMessageResyncReply = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const roleId = requireString(message.roleId, '缺少人员 ID')
-    const messageId = requireString(message.messageId, '缺少消息 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
+    const messageId = requireString(message.messageId, 'Missing message ID')
     const binding = deps.runtimeFrames.getByRole(chatId, roleId)
-    if (!binding?.ready) throw new Error('人员 iframe 尚未就绪，请先恢复人员')
+    if (!binding?.ready) throw new Error('The member iframe is not ready. Please restore the member first')
 
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const role = requireRole(store, chat.id, roleId)
       const assistantMessage = store.messagesById[messageId]
-      if (!isAssistantMessageForRole(assistantMessage, chat, role)) throw new Error('该回复不属于这个人员')
+      if (!isAssistantMessageForRole(assistantMessage, chat, role)) throw new Error('This response does not belong to this member')
       return { currentContent: assistantMessage.content }
     })
 
@@ -408,7 +418,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       messageId,
       currentContent: result.currentContent,
     })
-    if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? '重新同步回复失败')
+    if (isRecord(response) && response.ok === false) throw new Error(readOptionalString(response.error) ?? 'Failed to resync the response')
     if (isRecord(response) && isRecord(response.store)) {
       const updatedMessage = isRecord(response.message) ? response.message : undefined
       deps.log.warn('message-resync-reply:updated-store', {
@@ -425,11 +435,11 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleFrameRoleReady = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const tabId = messageTabId(message, sender)
-    if (tabId === undefined) throw new Error('缺少 sender tab')
+    if (tabId === undefined) throw new Error('Missing sender tab')
     rememberHost(sender, tabId)
 
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
     const frameId = senderFrameId(sender)
     const timestamp = deps.now()
     deps.log.info('frame-ready:received', {
@@ -450,7 +460,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       const role = requireRole(store, chat.id, roleId)
       role.status = 'ready'
       role.updatedAt = timestamp
-      updateConversation(role, readOptionalString(message.conversationUrl), readOptionalString(message.conversationId))
+      updateConversation(role, readOptionalString(message.conversationUrl), readOptionalString(message.conversationId), 'frame')
       chat.status = deps.getChatStatusFromRoles(store, chat)
       chat.updatedAt = timestamp
       return { role, replyHistory: getRoleReplyHistory(store, chat, role.id) }
@@ -466,7 +476,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, identity.chatId)
       const role = requireRole(store, chat.id, identity.roleId)
-      updateConversation(role, readOptionalString(message.conversationUrl), readOptionalString(message.conversationId))
+      updateConversation(role, readOptionalString(message.conversationUrl), readOptionalString(message.conversationId), 'nav')
       role.updatedAt = deps.now()
       chat.updatedAt = role.updatedAt
       return role
@@ -477,7 +487,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleSendAck = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const identity = readIdentity(deps, message, sender)
-    const messageId = requireString(message.messageId, '缺少消息 ID')
+    const messageId = requireString(message.messageId, 'Missing message ID')
     deps.log.info('send-ack:received', { ...identity, messageId, senderUrl: sender.url, tabId: messageTabId(message, sender), frameId: senderFrameId(sender) })
     const { store } = await mutateStore(store => {
       const chat = requireChat(store, identity.chatId)
@@ -488,6 +498,11 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         updateUserMessageDeliveryStatus(userMessage)
       }
       if (userMessage) role.contextCursor = Math.max(role.contextCursor, userMessage.seq)
+      // The site accepted the prompt, so its conversation now has this persona.
+      if (role.promptSyncPending?.messageId === messageId) {
+        role.promptSync = { signature: role.promptSyncPending.signature, conversationKey: role.frameConversationId }
+        delete role.promptSyncPending
+      }
       role.updatedAt = deps.now()
       chat.updatedAt = role.updatedAt
     })
@@ -497,7 +512,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleRoleStatus = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const mappedStatus = mapRuntimeRoleStatus(message.status)
-    if (!mappedStatus) return { ok: false, error: '未知人员状态' }
+    if (!mappedStatus) return { ok: false, error: 'Unknown member status' }
 
     const identity = readIdentityOptional(deps, message, sender)
     if (!identity) {
@@ -509,7 +524,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         tabId: messageTabId(message, sender),
         frameId: senderFrameId(sender),
       })
-      return { ok: false, error: '缺少 chatId/roleId，已忽略状态更新' }
+      return { ok: false, error: 'Missing chatId/roleId; status update ignored' }
     }
 
     const timestamp = deps.now()
@@ -545,8 +560,8 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     const identity = readIdentity(deps, message, sender)
     const content = readReplyContent(message.content)
     const images = readReplyImageSources(message.images)
-    if (!content && images.length === 0) throw new Error('回复内容不能为空')
-    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('图片回复只能来自已绑定的 ChatGPT 页面')
+    if (!content && images.length === 0) throw new Error('Response content cannot be empty')
+    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('Image responses can only come from a linked ChatGPT page')
     const contentFormat = message.contentFormat === 'markdown' ? 'markdown' : undefined
     const promptMessageId = readOptionalString(message.messageId)
     const replyAttemptId = readOptionalString(message.replyAttemptId)
@@ -627,11 +642,11 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleRoleReplyResync = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const identity = readIdentity(deps, message, sender)
-    const messageId = requireString(message.messageId, '缺少消息 ID')
+    const messageId = requireString(message.messageId, 'Missing message ID')
     const content = readReplyContent(message.content)
     const images = readReplyImageSources(message.images)
-    if (!content && images.length === 0) throw new Error('回复内容不能为空')
-    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('图片回复只能来自已绑定的 ChatGPT 页面')
+    if (!content && images.length === 0) throw new Error('Response content cannot be empty')
+    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('Image responses can only come from a linked ChatGPT page')
     const contentFormat = message.contentFormat === 'markdown' ? 'markdown' : undefined
     const timestamp = deps.now()
     const attachments = images.length > 0
@@ -645,7 +660,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
         const chat = requireChat(store, identity.chatId)
         const role = requireRole(store, chat.id, identity.roleId)
         const assistantMessage = store.messagesById[messageId]
-        if (!isAssistantMessageForRole(assistantMessage, chat, role)) throw new Error('该回复不属于这个人员')
+        if (!isAssistantMessageForRole(assistantMessage, chat, role)) throw new Error('This response does not belong to this member')
 
         const previousAttachmentIds = readyAttachmentIds(assistantMessage.attachments)
         updateConversation(role, readOptionalString(message.conversationUrl), readOptionalString(message.conversationId))
@@ -670,7 +685,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
 
   const handleRoleError = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const identity = readIdentity(deps, message, sender)
-    const reason = readOptionalString(message.reason) ?? readOptionalString(message.error) ?? '人员执行失败'
+    const reason = readOptionalString(message.reason) ?? readOptionalString(message.error) ?? 'Member execution failed'
     const promptMessageId = readOptionalString(message.messageId)
     const replyAttemptId = readOptionalString(message.replyAttemptId)
     deps.log.warn('role-error:received', { ...identity, promptMessageId, replyAttemptId, reason, senderUrl: sender.url, tabId: messageTabId(message, sender), frameId: senderFrameId(sender) })
@@ -737,7 +752,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     { type: 'GROUP_MESSAGE_SEND', handler: handleMessageSend },
     {
       type: 'TEAM_FRAME_ROLE_READY',
-      handler: (message, sender) => readOptionalString(message.chatId) ? handleFrameRoleReady(message, sender) : { ok: false, error: 'TEAM_FRAME_ROLE_READY 缺少 chatId' },
+      handler: (message, sender) => readOptionalString(message.chatId) ? handleFrameRoleReady(message, sender) : { ok: false, error: 'TEAM_FRAME_ROLE_READY is missing chatId' },
     },
     { type: 'TEAM_ROLE_CONVERSATION_UPDATED', handler: handleConversationUpdated },
     { type: 'TEAM_SEND_ACK', handler: handleSendAck },
@@ -779,7 +794,7 @@ function markChatHasNewMessage(store: OpenTeamStore, chat: GroupChat): void {
 function readIdentity(deps: MessageHandlersDependencies, message: RuntimeMessage, sender: chrome.runtime.MessageSender): { chatId: string; roleId: string } {
   const identity = readIdentityOptional(deps, message, sender)
   if (identity) return identity
-  throw new Error('缺少 chatId/roleId')
+  throw new Error('Missing chatId/roleId')
 }
 
 function readIdentityOptional(deps: MessageHandlersDependencies, message: RuntimeMessage, sender: chrome.runtime.MessageSender): { chatId: string; roleId: string } | undefined {
@@ -796,16 +811,16 @@ function readIdentityOptional(deps: MessageHandlersDependencies, message: Runtim
   return undefined
 }
 
-function updateConversation(role: GroupRole, conversationUrl: string | undefined, conversationId: string | undefined): void {
+function updateConversation(role: GroupRole, conversationUrl: string | undefined, conversationId: string | undefined, source: ConversationChangeSource = 'reply'): void {
   const safeUrl = normalizeSupportedChatConversationUrl(conversationUrl)
   const conversationIdFromUrl = extractSupportedConversationId(safeUrl)
   if (safeUrl && conversationIdFromUrl) {
     role.geminiConversationUrl = safeUrl
     role.geminiConversationId = conversationIdFromUrl
-    return
+  } else if (isMeaningfulConversationId(conversationId)) {
+    role.geminiConversationId = conversationId
   }
-
-  if (isMeaningfulConversationId(conversationId)) role.geminiConversationId = conversationId
+  syncConversation(role, safeUrl && conversationIdFromUrl ? conversationIdFromUrl : isMeaningfulConversationId(conversationId) ? conversationId : undefined, source)
 }
 
 function isMeaningfulConversationId(value: string | undefined): value is string {
@@ -926,14 +941,15 @@ function isRetryableRoleError(reason: string): boolean {
     '401',
     '403',
     'api key',
-    '已停止',
-    '停止回复',
-    '用户停止',
-    '找不到外部模型',
-    '模型不存在',
-    '密钥',
+    'Stopped',
+    'Stop reply',
+    'Stopped by the user',
+    'External model not found',
+    'Model does not exist',
+    'API key',
+    'đã dừng',
   ]
-  return !nonRetryablePatterns.some(pattern => normalized.includes(pattern))
+  return !nonRetryablePatterns.some(pattern => normalized.includes(pattern.toLowerCase()))
 }
 
 function clearRoleErrorRetryCount(retryCounts: Map<string, number>, chatId: string, roleId: string, messageId: string): void {
@@ -1058,7 +1074,7 @@ async function sendExternalModelDelivery(deps: MessageHandlersDependencies, clie
           await deps.broadcastStoreUpdated(update.store)
         }
         throwIfAborted(controller.signal)
-        if (!content.trim()) throw new Error('外部模型返回格式无效')
+        if (!content.trim()) throw new Error('Invalid response format from the external model')
         break
       } catch (error) {
         if (isAbortError(error) || controller.signal.aborted) throw error
@@ -1256,7 +1272,7 @@ function finalizeActiveExternalAssistantReply(store: OpenTeamStore, chat: GroupC
   const reply = findPendingAssistantAfterPrompt(store, chat, role, promptMessageId)
   if (!reply) return false
 
-  if (!reply.content.trim()) reply.content = '已停止回复'
+  if (!reply.content.trim()) reply.content = 'Reply stopped'
   reply.status = 'received'
 
   const userMessage = store.messagesById[promptMessageId]
@@ -1336,12 +1352,14 @@ function upsertFailedAssistantAfterPrompt(
 
 function roleFailureReplyContent(reason: string): string {
   const normalized = reason.toLowerCase()
-  if (normalized === 'send_failed') return '⚠️ 发送失败，请检查 AI 窗口是否开启或尝试刷新页面。\n\n可以点击下方的重新回复按钮再试一次。'
-  if (normalized === 'response_not_found') return '⚠️ 未检测到回复，可能是 AI 响应过慢或 DOM 结构已变更。\n\n可以点击下方的重新同步完整回复按钮尝试恢复。'
-  if (normalized === 'timeout') return '⚠️ 回复超时了。\n\n可以点击下方的重新回复按钮再试一次。'
-  if (normalized === 'site_blocked') return '⚠️ 站点阻断，请检查登录状态或处理 Cookie 弹窗。\n\n处理完成后点击重新回复。'
-  if (/超时|timeout/i.test(reason)) return '回复超时了。\n\n可以点击下方的重新回复按钮再试一次。'
-  return `回复失败：${reason}\n\n可以点击下方的重新回复按钮再试一次。`
+  if (normalized === 'send_failed') return '⚠️ Failed to send. Please check whether the AI window is open or try refreshing the page.\n\nClick the Regenerate response button below to try again.'
+  if (normalized === 'response_not_found') return '⚠️ No response detected. The AI may be responding too slowly or the DOM structure may have changed.\n\nClick the Resync full response button below to try to recover it.'
+  if (normalized === 'timeout') return '⚠️ The response timed out.\n\nClick the Regenerate response button below to try again.'
+  if (normalized === 'site_blocked') return '⚠️ The site is blocking access. Please check your login status or handle the Cookie popup.\n\nOnce resolved, click Regenerate response.'
+  if (/timeout/i.test(reason)) return 'The response timed out.\n\nClick the Regenerate response button below to try again.'
+  return `Response failed: ${reason}
+
+Click the Regenerate response button below to try again.`
 }
 
 function throwIfAborted(signal: AbortSignal): void {
@@ -1598,7 +1616,7 @@ function isBoundChatGptSender(
 }
 
 function requireImageAttachmentService(deps: MessageHandlersDependencies): NonNullable<MessageHandlersDependencies['imageAttachments']> {
-  if (!deps.imageAttachments) throw new Error('图片存储尚未初始化')
+  if (!deps.imageAttachments) throw new Error('Image storage has not been initialized')
   return deps.imageAttachments
 }
 
@@ -1642,7 +1660,7 @@ function requireNumber(value: unknown, error: string): number {
 }
 
 function requireNoteContent(value: unknown): NonNullable<OpenTeamStore['globalNote']> {
-  if (!isRecord(value) || typeof value.type !== 'string') throw new Error('笔记内容格式无效')
+  if (!isRecord(value) || typeof value.type !== 'string') throw new Error('Invalid note content format')
   return value as NonNullable<OpenTeamStore['globalNote']>
 }
 

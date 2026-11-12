@@ -1,6 +1,5 @@
 import type { ChatSite, MessageReference, OpenTeamStore, RoleTemplate } from '../group/types'
 import { createDefaultStore } from '../group/store'
-import { OPENTEAM_CONTROL_DEFAULT_PORT, type OpenTeamControlConnectionStatus } from '../shared/localControlProtocol'
 
 export type CachedMessageNode = { signature: string; node: HTMLElement; streamingSignature?: string }
 export type TemporaryPersonDraft = Pick<RoleTemplate, 'name' | 'description' | 'systemPrompt'> & { id: string; chatSite: ChatSite }
@@ -16,13 +15,14 @@ export interface RoleReadyWaiter {
 
 export interface TeamPageState {
   store: OpenTeamStore
-  controlStatus: OpenTeamControlConnectionStatus
   selectedChatId?: string
   selectedRoleId?: string
   selectedTemplateId?: string
   selectedReference?: MessageReference
   hostTabId?: number
   mentionIndex: number
+  // Escape closed the @ menu; it stays closed until the text changes.
+  mentionDismissed?: boolean
   peopleDrawerOpen: boolean
   chatMenuChatId?: string
   roleSiteMenuRoleId?: string
@@ -53,7 +53,6 @@ export interface TeamPageState {
 export function createTeamPageState(): TeamPageState {
   return {
     store: createDefaultStore(),
-    controlStatus: { state: 'disabled', port: OPENTEAM_CONTROL_DEFAULT_PORT },
     mentionIndex: 0,
     peopleDrawerOpen: false,
     thinkingTimeoutTimers: [],
@@ -68,10 +67,10 @@ export function createTeamPageState(): TeamPageState {
     peopleLibraryPage: 0,
     peopleLibraryTemplateType: 'custom',
     peopleLibrarySearchQuery: '',
-    peopleLibraryCategory: '全部',
+    peopleLibraryCategory: 'All',
     addPersonTemplateType: 'custom',
     addPersonSearchQuery: '',
-    addPersonCategory: '全部',
+    addPersonCategory: 'All',
     notesPanelOpen: false,
     activeNoteScope: 'chat',
   }

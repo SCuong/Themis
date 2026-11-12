@@ -22,6 +22,21 @@ export type SendPromptMessage = {
   autoSend?: boolean
   includesPersona?: boolean
   isRetry?: boolean
+  files?: PromptFile[]
+}
+
+// A file attached in the composer, sent to each AI site as a data URL.
+export type PromptFile = {
+  name: string
+  type?: string
+  dataUrl: string
+}
+
+export type DeleteConversationMessage = {
+  type: 'TEAM_DELETE_CONVERSATION'
+  chatId?: string
+  roleId?: string
+  conversationId: string
 }
 
 export type StopGenerationMessage = {
@@ -40,7 +55,7 @@ export type ResyncReplyMessage = {
   currentContent?: string
 }
 
-export type BackgroundToRoleMessage = SendPromptMessage | StopGenerationMessage | ResyncReplyMessage
+export type BackgroundToRoleMessage = SendPromptMessage | DeleteConversationMessage | StopGenerationMessage | ResyncReplyMessage
 
 export type RoleToBackgroundMessage =
   | { type: 'TEAM_FRAME_ROLE_READY'; chatId?: string; roleId: string; hostTabId?: number; conversationId: string; conversationUrl?: string }

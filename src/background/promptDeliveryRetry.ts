@@ -68,7 +68,7 @@ export async function sendPromptDeliveryWithRetry(
   const retryDelays = input.retryDelaysMs ?? DEFAULT_PROMPT_DELIVERY_RETRY_DELAYS_MS
   const maxRetryAttempts = RETRY_BUDGET.promptDeliveryRetry
   const isRetry = input.isRetry ?? false
-  let lastReason = '发送失败'
+  let lastReason = 'Failed to send'
 
   for (let attemptIndex = 0; attemptIndex <= retryDelays.length; attemptIndex += 1) {
     const latestBinding = deps.getLatestBinding(input.chatId, input.delivery.roleId)

@@ -33,7 +33,7 @@ export function buildExternalModelPrompt(
   const language = normalizeLanguage(store.settings.language)
   const directPrompt = buildPromptWithExternalContext(chat, role, userMessage, roles, contextAfterMemory, budget, options, language)
   const withSummary = joinSections([
-    memory?.summary ? `${language === 'en' ? 'Conversation summary:' : '历史摘要：'}\n${memory.summary}` : undefined,
+    memory?.summary ? `${language === 'en' ? 'Conversation summary:' : 'History summary:'}\n${memory.summary}` : undefined,
     directPrompt,
   ])
   if (withSummary.length <= budget) return { content: withSummary }
@@ -47,7 +47,7 @@ export function buildExternalModelPrompt(
   const summarizedThroughSeq = summarizedMessages[summarizedMessages.length - 1]?.seq ?? memory?.summarizedThroughSeq ?? 0
   const summary = compressMessages(memory?.summary, summarizedMessages, language)
   const compressedPrompt = joinSections([
-    summary ? `${language === 'en' ? 'Conversation summary:' : '历史摘要：'}\n${summary}` : undefined,
+    summary ? `${language === 'en' ? 'Conversation summary:' : 'History summary:'}\n${summary}` : undefined,
     buildPromptWithExternalContext(chat, role, userMessage, roles, [], budget, options, language),
   ])
 
@@ -85,7 +85,7 @@ function buildPromptWithExternalContext(
 
   const context = contextMessages.map(message => formatContextMessage(message, language)).join('\n\n')
   return joinSections([
-    context ? `${language === 'en' ? 'Previous context between you and the user:' : '你和用户此前的上下文：'}\n${context}` : undefined,
+    context ? `${language === 'en' ? 'Previous context between you and the user:' : 'Your previous context with the user:'}\n${context}` : undefined,
     basePrompt,
   ])
 }
@@ -109,7 +109,7 @@ function externalContextMessages(store: OpenTeamStore, chat: GroupChat, role: Gr
 function compressMessages(previousSummary: string | undefined, messages: GroupMessage[], language: OpenTeamLanguage): string {
   const bullets = messages
     .filter(message => message.content.trim())
-    .map(message => `- ${speakerLabel(message, language)}${language === 'en' ? ': ' : '：'}${compactContent(message.content)}`)
+    .map(message => `- ${speakerLabel(message, language)}${language === 'en' ? ': ' : ': '}${compactContent(message.content)}`)
   return joinSections([
     previousSummary,
     bullets.length > 0 ? bullets.join('\n') : undefined,
@@ -122,16 +122,16 @@ function compactContent(content: string): string {
 }
 
 function speakerLabel(message: GroupMessage, language: OpenTeamLanguage): string {
-  if (message.type === 'assistant') return message.roleName || (language === 'en' ? 'Person' : '人员')
-  if (message.type === 'system') return language === 'en' ? 'System' : '系统'
-  return language === 'en' ? 'User' : '用户'
+  if (message.type === 'assistant') return message.roleName || (language === 'en' ? 'Person' : 'Person')
+  if (message.type === 'system') return language === 'en' ? 'System' : 'System'
+  return language === 'en' ? 'User' : 'User'
 }
 
 function trimPromptFromStart(prompt: string, budget: number, language: OpenTeamLanguage): string {
   if (prompt.length <= budget) return prompt
   const head = prompt.slice(0, Math.floor(budget * 0.45)).trimEnd()
   const tail = prompt.slice(-Math.floor(budget * 0.55)).trimStart()
-  const omittedLabel = language === 'en' ? '[Middle context omitted]' : '[中间上下文已省略]'
+  const omittedLabel = language === 'en' ? '[Middle context omitted]' : '[Intermediate context has been omitted]'
   return `${head}\n\n${omittedLabel}\n\n${tail}`
 }
 

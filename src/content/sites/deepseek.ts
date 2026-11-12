@@ -123,7 +123,7 @@ async function waitForDeepSeekSendButton(editor: HTMLTextAreaElement, timeoutMs:
     await new Promise(resolve => window.setTimeout(resolve, 50))
   }
 
-  throw new Error('DeepSeek 发送按钮暂不可用，请稍后重试')
+  throw new Error('DeepSeek send button is unavailable. Try again shortly.')
 }
 
 function findDeepSeekSendButton(editor: HTMLTextAreaElement): HTMLElement | undefined {
@@ -136,7 +136,7 @@ function isDeepSeekSendButton(element: HTMLElement): boolean {
   if (element.getAttribute('aria-disabled') === 'true') return false
   if (element instanceof HTMLButtonElement && element.disabled) return false
   if (element.classList.contains('ds-toggle-button')) return false
-  if (buttonLabelMatches(element, /attach|upload|file|camera|image|voice|microphone|附件|上传|图片|语音/)) return false
+  if (buttonLabelMatches(element, /attach|upload|file|camera|image|voice|microphone/)) return false
   if (
     !element.classList.contains('_52c986b') &&
     !element.classList.contains('ds-icon-button') &&
@@ -185,7 +185,7 @@ async function stopDeepSeekGenerating(): Promise<boolean> {
 }
 
 function findDeepSeekStopButton(): HTMLElement | undefined {
-  return [...document.querySelectorAll<HTMLElement>('[role="button"], button')].find(button => buttonLabelMatches(button, /stop|stopping|停止|中止/) && isClickableDeepSeekButton(button))
+  return [...document.querySelectorAll<HTMLElement>('[role="button"], button')].find(button => buttonLabelMatches(button, /stop|stopping/) && isClickableDeepSeekButton(button))
 }
 
 function isClickableDeepSeekButton(element: HTMLElement): boolean {

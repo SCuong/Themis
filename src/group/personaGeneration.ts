@@ -17,7 +17,7 @@ export function buildRoleTemplatePersonaPrompt(input: RoleTemplatePersonaPromptI
   const language = normalizeLanguage(input.language)
   if (language === 'en') {
     return [
-      'You are the OpenTeam people-library persona generator.',
+      'You are the Themis people-library persona generator.',
       PROMPT_I18N.en.jsonOnly,
       '',
       'Goal: based on a short user description, generate a reusable person suitable for an AI group chat.',
@@ -41,25 +41,25 @@ export function buildRoleTemplatePersonaPrompt(input: RoleTemplatePersonaPromptI
   }
 
   return [
-    '你是 OpenTeam 的人员库人设生成器。',
-    PROMPT_I18N['zh-CN'].jsonOnly,
+    'You are the persona generator for Themis\'s member library.',
+    PROMPT_I18N.vi.jsonOnly,
     '',
-    '目标：根据用户的一段描述，生成一个适合加入 AI 群聊的可复用人员。',
+    'Goal: Based on the user\'s description, generate a reusable member suitable for an AI group chat.',
     '',
-    '硬性要求：',
-    `1. name 是简短人员名称，最多 ${ROLE_NAME_MAX_CHARACTERS} 个字。`,
-    '2. description 是一句话职责摘要。',
-    '3. systemPrompt 是可直接发给模型的人设提示词，要写清楚身份、工作方式、输出习惯和边界。',
-    `4. ${PROMPT_I18N['zh-CN'].personaLanguageInstruction}`,
+    'Mandatory requirements:',
+    `1. name is a short member name, with a maximum of ${ROLE_NAME_MAX_CHARACTERS} characters.`,
+    '2. description is a one-sentence summary of responsibilities.',
+    '3. systemPrompt is a persona prompt that can be sent directly to the model. Clearly specify the identity, working approach, output conventions, and boundaries.',
+    `4. ${PROMPT_I18N.vi.personaLanguageInstruction}`,
     '',
-    '返回 JSON schema：',
+    'Return this JSON schema:',
     JSON.stringify({
-      name: '增长顾问',
-      description: '负责从获客、转化和复盘角度给建议。',
-      systemPrompt: '你是增长顾问。先判断目标和约束，再给出可执行建议。',
+      name: 'Growth advisor',
+      description: 'Responsible for advising on customer acquisition, conversion, and retrospective analysis.',
+      systemPrompt: 'You are a growth advisor. Assess the goals and constraints first, then provide actionable recommendations.',
     }, null, 2),
     '',
-    '用户描述：',
+    'User description:',
     input.description.trim(),
   ].join('\n')
 }
@@ -74,7 +74,7 @@ export function parseGeneratedPersonDraft(text: string): GeneratedPersonDraft {
     if (!name || !systemPrompt) throw new Error('missing required fields')
     return { name, description, systemPrompt }
   } catch {
-    throw new Error('AI 生成人设返回格式无效')
+    throw new Error('Invalid response format from AI persona generation')
   }
 }
 

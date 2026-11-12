@@ -22,15 +22,15 @@ export function getChatMessages(store: OpenTeamStore, chat: GroupChat): GroupMes
 }
 
 export function requireChat(store: OpenTeamStore, chatId: unknown): GroupChat {
-  if (typeof chatId !== 'string') throw new Error('缺少群聊 ID')
+  if (typeof chatId !== 'string') throw new Error('Missing group chat ID')
   const chat = store.chatsById[chatId]
-  if (!chat) throw new Error(`找不到群聊：${chatId}`)
+  if (!chat) throw new Error(`Group chat not found: ${chatId}`)
   return chat
 }
 
 export function requireRole(store: OpenTeamStore, chatId: string, roleId: unknown): GroupRole {
-  if (typeof roleId !== 'string') throw new Error('缺少人员 ID')
+  if (typeof roleId !== 'string') throw new Error('Missing member ID')
   const role = store.rolesById[roleId]
-  if (!role || role.chatId !== chatId) throw new Error(`找不到人员：${roleId}`)
+  if (!role || role.chatId !== chatId) throw new Error(`Member not found: ${roleId}`)
   return role
 }

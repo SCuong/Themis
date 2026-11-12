@@ -5,18 +5,21 @@ import {
   MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS,
   MAX_ORCHESTRATION_MAX_ROUNDS,
 } from './types'
-import { OPENTEAM_CONTROL_DEFAULT_PORT, OPENTEAM_CONTROL_LEGACY_DEFAULT_PORT } from '../shared/localControlProtocol'
+import { openApiKeys, sealApiKeys } from '../shared/apiKeyVault'
 import { defaultLanguageForEnvironment, normalizeLanguage } from '../shared/i18n'
 import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageHighlight, OpenTeamSettings, OpenTeamStore, OpenTeamViewState, OrchestrationFlow, OrchestrationRun, RichNoteDocument, RoleTemplate } from './types'
 import { normalizeMessageHighlightColor } from './highlightColors'
 import { DEFAULT_CUSTOM_ROLE_TEMPLATES } from './defaultCustomRoleTemplates'
+import { synchronizeCustomRolePersonas } from './customRolePersonas'
 
-export const STORE_KEY = 'openteam.groupStore'
-export const META_STORE_KEY = 'openteam.meta.v2'
-export const CHAT_KEY_PREFIX = 'openteam.chat.'
-export const MESSAGE_CHUNK_KEY_PREFIX = 'openteam.messages.'
+export const STORE_KEY = 'themis.groupStore'
+export const META_STORE_KEY = 'themis.meta.v2'
+export const CHAT_KEY_PREFIX = 'themis.chat.'
+export const MESSAGE_CHUNK_KEY_PREFIX = 'themis.messages.'
 export const CURRENT_STORE_VERSION = 7
 export const MESSAGE_CHUNK_SIZE = 100
+// Pending attachment deletions, kept apart from the store documents so a crash cannot lose them.
+export const CLEANUP_QUEUE_KEY = 'themis.cleanupQueue'
 
 interface OpenTeamMetaStore {
   version: number
@@ -60,8 +63,6 @@ const DEFAULT_SETTINGS: OpenTeamSettings = {
   defaultChatSite: 'deepseek',
   externalModelOrder: [],
   externalModelsById: {},
-  agentControlEnabled: false,
-  agentControlPort: OPENTEAM_CONTROL_DEFAULT_PORT,
   language: defaultLanguageForEnvironment(),
 }
 
@@ -94,9 +95,11 @@ export function createDefaultStore(): OpenTeamStore {
 }
 
 export async function loadStore(): Promise<OpenTeamStore> {
-  const metaResult = await chrome.storage.local.get(META_STORE_KEY)
+  const metaResult = await chrome.storage.local.get([META_STORE_KEY, CLEANUP_QUEUE_KEY])
   if (metaResult[META_STORE_KEY]) {
-    return loadV2Store(metaResult[META_STORE_KEY])
+    const store = await openApiKeys(await loadV2Store(metaResult[META_STORE_KEY]))
+    store.otCleanupQueue = Array.isArray(metaResult[CLEANUP_QUEUE_KEY]) ? metaResult[CLEANUP_QUEUE_KEY] : []
+    return store
   }
 
   const legacyResult = await chrome.storage.local.get(STORE_KEY)
@@ -110,6 +113,8 @@ export async function loadStore(): Promise<OpenTeamStore> {
 export async function saveStore(store: OpenTeamStore): Promise<void> {
   const normalized = normalizeStore(store)
   const items = buildStorageItems(normalized)
+  await sealApiKeys((items[META_STORE_KEY] as { settings?: OpenTeamSettings } | undefined)?.settings)
+  if (Array.isArray(store?.otCleanupQueue)) items[CLEANUP_QUEUE_KEY] = store.otCleanupQueue
   await chrome.storage.local.set(items)
   await removeStaleStorageKeys(Object.keys(items))
 }
@@ -170,7 +175,7 @@ function normalizeStore(raw: unknown): OpenTeamStore {
     migrateDefaultCustomTemplateSites(normalized)
   }
 
-  return normalized
+  return synchronizeCustomRolePersonas(normalized)
 }
 
 async function loadV2Store(rawMeta: unknown): Promise<OpenTeamStore> {
@@ -617,8 +622,6 @@ function normalizeSettings(raw: unknown, storedVersion = CURRENT_STORE_VERSION):
     defaultChatSite: storedVersion < 6 && defaultChatSite === 'gemini' ? DEFAULT_SETTINGS.defaultChatSite : defaultChatSite,
     externalModelOrder: normalizeExternalModelOrder(raw.externalModelOrder, externalModelsById),
     externalModelsById,
-    agentControlEnabled: raw.agentControlEnabled === true,
-    agentControlPort: readAgentControlPort(raw.agentControlPort, storedVersion),
     language: readSettingsLanguage(raw.language),
   }
 }
@@ -626,13 +629,6 @@ function normalizeSettings(raw: unknown, storedVersion = CURRENT_STORE_VERSION):
 function readSettingsLanguage(raw: unknown): OpenTeamSettings['language'] {
   if (typeof raw === 'undefined' || raw === null) return defaultLanguageForEnvironment()
   return normalizeLanguage(raw)
-}
-
-function readAgentControlPort(raw: unknown, storedVersion: number): number {
-  if (typeof raw !== 'number' || !Number.isInteger(raw)) return DEFAULT_SETTINGS.agentControlPort
-  if (raw < 1024 || raw > 65535) return DEFAULT_SETTINGS.agentControlPort
-  if (storedVersion < 7 && raw === OPENTEAM_CONTROL_LEGACY_DEFAULT_PORT) return OPENTEAM_CONTROL_DEFAULT_PORT
-  return raw
 }
 
 function readSettingsChatSite(raw: unknown): OpenTeamSettings['defaultChatSite'] {

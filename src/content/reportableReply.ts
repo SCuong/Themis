@@ -23,6 +23,13 @@ export async function resolveReportableReplyText(
   if (!fallbackText.trim()) return { text: '', ...(images.length > 0 ? { images } : {}) }
 
   try {
+    const markdownText = siteAdapter.readResponseMarkdown?.(element).trim()
+    if (markdownText) return { text: markdownText, contentFormat: 'markdown', ...(images.length > 0 ? { images } : {}) }
+  } catch (error) {
+    log.warn('reply-markdown:failed', { error: error instanceof Error ? error.message : String(error) })
+  }
+
+  try {
     const copiedText = await siteAdapter.readResponseTextFromCopy?.(element)
     const trimmedCopiedText = copiedText?.trim()
     if (trimmedCopiedText && !isSuspiciousCopiedReply(trimmedCopiedText, fallbackText)) {
@@ -38,13 +45,6 @@ export async function resolveReportableReplyText(
     log.warn('reply-copy:failed', { error: error instanceof Error ? error.message : String(error) })
   }
 
-  try {
-    const markdownText = siteAdapter.readResponseMarkdown?.(element).trim()
-    if (markdownText) return { text: markdownText, contentFormat: 'markdown', ...(images.length > 0 ? { images } : {}) }
-  } catch (error) {
-    log.warn('reply-markdown:failed', { error: error instanceof Error ? error.message : String(error) })
-  }
-
   return { text: fallbackText, ...(images.length > 0 ? { images } : {}) }
 }
 
@@ -54,7 +54,7 @@ export async function readResyncReplyText(
   log: ContentLogger,
 ): Promise<ReportableReplyText> {
   const candidate = findResyncReplyCandidate(siteAdapter, currentContent, log)
-  if (!candidate) throw new Error('当前页面没有可同步的回复内容')
+  if (!candidate) throw new Error('There is no reply to sync on this page')
   return resolveReportableReplyText(siteAdapter, candidate.element, candidate.text, log)
 }
 

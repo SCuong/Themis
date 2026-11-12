@@ -1,6 +1,5 @@
 export interface FloatingWindowDependencies {
   appShellEl: HTMLElement
-  closeWindowEl?: HTMLButtonElement
   toggleWindowSizeEl: HTMLButtonElement
   toggleFullscreenEl: HTMLButtonElement
   windowLauncherEl: HTMLButtonElement
@@ -56,7 +55,6 @@ export function createFloatingWindowControls(deps: FloatingWindowDependencies): 
     if (!minimized && deps.appShellEl.style.transform !== 'none') ensureShellPositioned()
     deps.appShellEl.classList.toggle('minimized', minimized)
     deps.windowLauncherEl.hidden = !minimized
-    deps.toggleWindowSizeEl.textContent = minimized ? '□' : '−'
     deps.toggleWindowSizeEl.setAttribute('aria-expanded', String(!minimized))
     if (!minimized) window.requestAnimationFrame(clampShellPosition)
   }
@@ -68,14 +66,12 @@ export function createFloatingWindowControls(deps: FloatingWindowDependencies): 
       deps.appShellEl.style.transform = ''
       deps.appShellEl.classList.remove('minimized')
       deps.windowLauncherEl.hidden = true
-      deps.toggleWindowSizeEl.textContent = '−'
       deps.toggleWindowSizeEl.setAttribute('aria-expanded', 'true')
     }
     deps.appShellEl.classList.toggle('fullscreen', fullscreen)
-    deps.toggleFullscreenEl.textContent = fullscreen ? '⤡' : '⛶'
     deps.toggleFullscreenEl.setAttribute('aria-pressed', String(fullscreen))
-    deps.toggleFullscreenEl.setAttribute('aria-label', fullscreen ? '退出全屏' : '全屏窗口')
-    deps.toggleFullscreenEl.title = fullscreen ? '退出全屏' : '全屏窗口'
+    deps.toggleFullscreenEl.setAttribute('aria-label', fullscreen ? 'Exit full screen' : 'Fullscreen window')
+    deps.toggleFullscreenEl.title = fullscreen ? 'Exit full screen' : 'Fullscreen window'
   }
 
   function registerFloatingWindowControls(): void {
@@ -145,7 +141,6 @@ export function createFloatingWindowControls(deps: FloatingWindowDependencies): 
 
     deps.windowResizeHandleEl?.addEventListener('pointerup', stopResizing)
     deps.windowResizeHandleEl?.addEventListener('pointercancel', stopResizing)
-    deps.closeWindowEl?.addEventListener('click', () => setWindowMinimized(true))
     deps.toggleWindowSizeEl.addEventListener('click', () => setWindowMinimized(!deps.appShellEl.classList.contains('minimized')))
     deps.toggleFullscreenEl.addEventListener('click', () => setWindowFullscreen(!deps.appShellEl.classList.contains('fullscreen')))
     setWindowFullscreen(deps.appShellEl.classList.contains('fullscreen'))

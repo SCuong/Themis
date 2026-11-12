@@ -275,7 +275,7 @@ export function createReplyObserver(options: {
 
   function reportAcceptedReply(messageId: string, reply: ReportableReplyText, source: ReplySource): void {
     const assignedRole = roleSession.getAssignedRole()
-    if (!assignedRole) return
+    if (!assignedRole || roleSession.getActiveMessageId() !== messageId) return
 
     const replyAttemptId = roleSession.clearActivePrompt(messageId)
     clearPromptReplyBaseline()

@@ -4,6 +4,8 @@ import type { BackgroundMessageRoute } from './messageRouter'
 import { messageTabId, type RuntimeMessage } from './runtimeClient'
 import type { RuntimeFrameRegistry } from './runtimeFrames'
 import { mutateStore, requireChat } from './storeAccess'
+import { enqueueCleanup, purgeChatData, runCleanup } from './cleanupQueue'
+import { deleteRemoteConversations, type RemoteDeleteDependencies } from './remoteDelete'
 
 export const CHAT_ROUTE_TYPES = [
   'GROUP_CHAT_CREATE',
@@ -25,8 +27,9 @@ export interface ChatHandlersDependencies {
   }
   newId(prefix: string): string
   now(): number
-  runtimeFrames: Pick<RuntimeFrameRegistry, 'removeRole'>
-  imageAttachments?: {
+  runtimeFrames: Pick<RuntimeFrameRegistry, 'removeRole' | 'getByRole'>
+  sendRoleMessage: RemoteDeleteDependencies['sendRoleMessage']
+  imageAttachments: {
     deleteByMessageIds(messageIds: string[]): Promise<void>
     deleteByChatId(chatId: string): Promise<void>
   }
@@ -65,7 +68,7 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
       const patchKeys: string[] = []
 
       if (patch.name !== undefined) {
-        const name = requireString(patch.name, '群聊名称不能为空')
+        const name = requireString(patch.name, 'Group chat name cannot be empty')
         chat.name = name
         patchKeys.push('name')
       }
@@ -94,7 +97,9 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
   }
 
   const handleChatDelete = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    // Runs before the local delete, while the members' frames and conversation ids still exist.
+    const remoteDeletes = message.deleteRemote === true ? await deleteRemoteConversations(deps, chatId) : undefined
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const roleIds = [...chat.roleIds]
@@ -103,8 +108,15 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
       for (const roleId of roleIds) {
         delete store.rolesById[roleId]
         deps.runtimeFrames.removeRole(chat.id, roleId)
+        delete store.externalRoleMemoriesById?.[roleId]
       }
-      for (const messageId of messageIds) delete store.messagesById[messageId]
+      const fileIds: string[] = []
+      for (const messageId of messageIds) {
+        for (const file of store.messagesById[messageId]?.files ?? []) if (file?.id) fileIds.push(file.id)
+        delete store.messagesById[messageId]
+        delete store.messageHighlightsById?.[messageId]
+      }
+      purgeChatData(store, chat.id)
 
       store.chatOrder = store.chatOrder.filter(id => id !== chat.id)
       delete store.chatsById[chat.id]
@@ -112,30 +124,31 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
       if (store.viewState?.chatReadSeqById) delete store.viewState.chatReadSeqById[chat.id]
       if (store.viewState?.chatHasNewMessageById) delete store.viewState.chatHasNewMessageById[chat.id]
 
-      return { chatId: chat.id, roleIds, messageIds }
+      const cleanupId = enqueueCleanup(store, { id: deps.newId('cleanup'), kind: 'chat', chatId: chat.id, fileIds, createdAt: deps.now() })
+      return { chatId: chat.id, roleIds, messageIds, cleanupId }
     })
-    try {
-      await deps.imageAttachments?.deleteByChatId(result.chatId)
-    } catch (error) {
-      deps.log.warn('chat-delete:image-cleanup-failed', {
-        chatId: result.chatId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
+    const pending = await runCleanup(deps)
     deps.log.info('chat-delete:stored', { chatId: result.chatId, roleCount: result.roleIds.length, messageCount: result.messageIds.length })
     await deps.broadcastStoreUpdated(store)
-    return { ok: true, chatId: result.chatId, store }
+    return { ok: true, chatId: result.chatId, store, cleanup: pending.has(result.cleanupId) ? 'pending' : 'done', ...(remoteDeletes ? { remoteDeletes } : {}) }
   }
 
   const handleChatClearMessages = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
     const timestamp = deps.now()
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const roleIds = [...chat.roleIds]
       const messageIds = [...chat.messageIds]
+      const fileIds: string[] = []
 
-      for (const messageId of messageIds) delete store.messagesById[messageId]
+      for (const messageId of messageIds) {
+        for (const file of store.messagesById[messageId]?.files ?? []) if (file?.id) fileIds.push(file.id)
+        delete store.messagesById[messageId]
+        delete store.messageHighlightsById?.[messageId]
+      }
+      delete store.externalChatMemoriesById?.[chat.id]
+      for (const roleId of roleIds) delete store.externalRoleMemoriesById?.[roleId]
       chat.messageIds = []
       chat.nextMessageSeq = 1
       chat.updatedAt = timestamp
@@ -147,6 +160,7 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
         role.status = 'loading'
         role.contextCursor = 0
         role.updatedAt = timestamp
+        delete role.promptSync
         delete role.geminiConversationId
         delete role.geminiConversationUrl
         delete role.lastPromptMessageId
@@ -155,23 +169,17 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
 
       chat.status = roleIds.length > 0 ? 'initializing' : 'draft'
       markChatRead(store, chat)
-      return { chatId: chat.id, roleIds, messageIds }
+      const cleanupId = enqueueCleanup(store, { id: deps.newId('cleanup'), kind: 'messages', chatId: chat.id, messageIds, fileIds, createdAt: timestamp })
+      return { chatId: chat.id, roleIds, messageIds, cleanupId }
     })
-    try {
-      await deps.imageAttachments?.deleteByMessageIds(result.messageIds)
-    } catch (error) {
-      deps.log.warn('chat-clear-messages:image-cleanup-failed', {
-        chatId: result.chatId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
+    const pending = await runCleanup(deps)
     deps.log.info('chat-clear-messages:stored', { chatId: result.chatId, roleCount: result.roleIds.length, messageCount: result.messageIds.length })
     await deps.broadcastStoreUpdated(store)
-    return { ok: true, chatId: result.chatId, store }
+    return { ok: true, chatId: result.chatId, store, cleanup: pending.has(result.cleanupId) ? 'pending' : 'done' }
   }
 
   const handleChatClose = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
     const timestamp = deps.now()
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
@@ -216,7 +224,7 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
 
 function createChat(store: OpenTeamStore, message: RuntimeMessage, deps: ChatHandlersDependencies): GroupChat {
   const timestamp = deps.now()
-  const name = typeof message.name === 'string' && message.name.trim() ? message.name.trim() : '新群聊'
+  const name = typeof message.name === 'string' && message.name.trim() ? message.name.trim() : 'New chat'
   const description = readOptionalString(message.description)
   const chat: GroupChat = {
     id: deps.newId('chat'),
@@ -399,7 +407,7 @@ function duplicateOrchestrationStage(stage: OrchestrationStage, roleIdMap: Map<s
 }
 
 function duplicatedChatName(store: OpenTeamStore, sourceName: string): string {
-  const baseName = `${sourceName} 副本`
+  const baseName = `${sourceName} Copy`
   const existingNames = new Set(store.chatOrder.map(chatId => store.chatsById[chatId]?.name).filter(Boolean))
   if (!existingNames.has(baseName)) return baseName
 

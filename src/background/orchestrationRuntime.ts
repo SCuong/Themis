@@ -90,9 +90,9 @@ export async function startOrchestrationRun(deps: OrchestrationRuntimeDependenci
     if (!isTest) {
       const activeRunId = store.activeOrchestrationRunIdByChatId[chat.id]
       const activeRun = activeRunId ? store.orchestrationRunsById[activeRunId] : undefined
-      if (activeRun && activeRun.status === 'pending') throw new Error('该群聊已有运行中的编排')
+      if (activeRun && activeRun.status === 'pending') throw new Error('This group chat already has a running workflow')
       if (activeRun && activeRun.status === 'running') {
-        if (hasLiveRunningRolePrompt(store, chat, activeRun)) throw new Error('该群聊已有运行中的编排')
+        if (hasLiveRunningRolePrompt(store, chat, activeRun)) throw new Error('This group chat already has a running workflow')
         stopStaleActiveRun(store, chat, activeRun, timestamp)
       }
       if (activeRunId && !activeRun) delete store.activeOrchestrationRunIdByChatId[chat.id]
@@ -112,7 +112,7 @@ export async function startOrchestrationRun(deps: OrchestrationRuntimeDependenci
       createdAt: timestamp,
       status: 'received',
     }
-    if (!taskMessage.content) throw new Error('编排任务不能为空')
+    if (!taskMessage.content) throw new Error('Workflow task cannot be empty')
 
     const run: OrchestrationRun = {
       id: deps.newId('run'),
@@ -220,8 +220,8 @@ export async function resumeOrchestrationRun(deps: OrchestrationRuntimeDependenc
   const prepared = await mutateStore(store => {
     const chat = requireChat(store, input.chatId)
     const run = findResumableRun(store, chat, input.runId)
-    if (!run) throw new Error('找不到可继续的编排')
-    if (run.status !== 'stopped') throw new Error('只有已停止的编排可以继续')
+    if (!run) throw new Error('No workflow available to resume')
+    if (run.status !== 'stopped') throw new Error('Only stopped workflows can be resumed')
     const flow = requireFlow(store, chat.id, run.flowId)
     validateExecutableFlow(store, chat, flow)
     const last = currentStageRun(run)
@@ -362,7 +362,7 @@ export async function retryOrchestrationStage(deps: OrchestrationRuntimeDependen
     const restartingStageRun = findRestartingStageRun(run, stageId)
     if (restartingStageRun) return { runId: run.id, stageIndex: restartingStageRun.stageIndex, alreadyRestarting: true }
     const stageRun = findRetryableStageRun(run, stageId)
-    if (!stageRun) throw new Error('找不到可重试的编排节点')
+    if (!stageRun) throw new Error('No workflow node available to retry')
     removeStageRunsAfter(run, stageRun)
     markStageRunRestarting(stageRun, timestamp)
     run.status = 'running'
@@ -385,7 +385,7 @@ export async function skipOrchestrationStage(deps: OrchestrationRuntimeDependenc
     const chat = requireChat(store, chatId)
     const run = requireActiveRun(store, chat)
     const stageRun = findRetryableStageRun(run, stageId)
-    if (!stageRun) throw new Error('找不到可跳过的编排节点')
+    if (!stageRun) throw new Error('No workflow node available to skip')
     stageRun.status = 'skipped'
     stageRun.completedAt = timestamp
     for (const roleRun of Object.values(stageRun.roleRuns)) {
@@ -429,12 +429,12 @@ async function startStage(deps: OrchestrationRuntimeDependencies, runId: string,
       return { deliveries: [], externalDeliveries: [] }
     }
     if (run.stageRuns.length >= maxNodeExecutionsForRun(run)) {
-      failRun(store, chat, run, `已达到最大节点执行数（${maxNodeExecutionsForRun(run)}），流程可能存在未收敛的循环。`, timestamp)
+      failRun(store, chat, run, `Maximum node executions reached (${maxNodeExecutionsForRun(run)}). The workflow may contain a loop that does not converge.`, timestamp)
       return { deliveries: [], externalDeliveries: [] }
     }
 
     const taskMessage = getRunTaskMessage(store, chat, run)
-    if (!taskMessage) throw new Error('找不到编排任务消息')
+    if (!taskMessage) throw new Error('Workflow task message not found')
     const targetRoleIds = targetRoleIdsForStage(stage)
     const frameBlocker = findLocalRoleFrameBlocker(store, chat, targetRoleIds, deps)
     if (frameBlocker) {
@@ -506,14 +506,14 @@ async function startStage(deps: OrchestrationRuntimeDependencies, runId: string,
       stageRun.status = 'error'
       stageRun.completedAt = timestamp
       run.status = 'error'
-      run.error = failedRoleRun.error ?? '节点投递失败'
+      run.error = failedRoleRun.error ?? 'Failed to dispatch the node'
       chat.status = 'error'
     } else if (targetRoleIds.length === 0 || allRoleRunsFinished(stageRun)) {
       stageRun.status = targetRoleIds.length === 0 ? 'skipped' : 'error'
       stageRun.completedAt = timestamp
       if (stageRun.status === 'error') {
         run.status = 'error'
-        run.error = '节点没有可投递人员'
+        run.error = 'The node has no member available for dispatch'
         chat.status = 'error'
       }
     }
@@ -617,7 +617,7 @@ async function sendOrchestrationPromptDelivery(deps: OrchestrationRuntimeDepende
 async function sendExternalOrchestrationPrompt(deps: OrchestrationRuntimeDependencies, delivery: ExternalPromptDelivery): Promise<void> {
   const client = deps.externalModelClient
   if (!client) {
-    await markOrchestrationRoleError(deps, { chatId: delivery.chatId, roleId: delivery.roleId, promptMessageId: delivery.messageId, error: '外部模型客户端不可用' })
+    await markOrchestrationRoleError(deps, { chatId: delivery.chatId, roleId: delivery.roleId, promptMessageId: delivery.messageId, error: 'External model client is unavailable' })
     return
   }
   try {
@@ -711,7 +711,7 @@ function applyReviewDecision(store: OpenTeamStore, chat: GroupChat, run: Orchest
   if (!stage) return nextStageDecision(store, chat, run, stageRun, timestamp)
   if (decision === 'fail' && reviewAttemptCount(run, stage.id) >= reviewMaxAttempts(stage)) {
     if (stage.review?.onMaxAttempts !== 'continue') {
-      failRun(store, chat, run, `审核未通过，已达到最大审核次数（${reviewMaxAttempts(stage)} 次）`, timestamp)
+      failRun(store, chat, run, `Review failed; maximum review attempts reached (${reviewMaxAttempts(stage)} attempts)`, timestamp)
       return { next: false }
     }
     const continueTargets = reviewBranchStageIndices(flow, stageRun.stageId, 'pass')
@@ -747,7 +747,7 @@ function failRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, r
 
 function requireFlow(store: OpenTeamStore, chatId: string, flowId: string): OrchestrationFlow {
   const flow = store.orchestrationFlowsById[flowId]
-  if (!flow || flow.chatId !== chatId) throw new Error(`找不到编排流程：${flowId}`)
+  if (!flow || flow.chatId !== chatId) throw new Error(`Workflow not found: ${flowId}`)
   return flow
 }
 
@@ -765,10 +765,10 @@ function findResumableRun(store: OpenTeamStore, chat: GroupChat, runId: string |
 }
 
 function validateExecutableFlow(store: OpenTeamStore, chat: GroupChat, flow: OrchestrationFlow): void {
-  if (!Array.isArray(flow.stages) || flow.stages.length === 0) throw new Error('编排流程没有可执行节点')
+  if (!Array.isArray(flow.stages) || flow.stages.length === 0) throw new Error('The workflow has no executable nodes')
   for (const stage of flow.stages) {
-    if (stage.kind === 'roles' && stage.roleIds.length === 0) throw new Error(`执行节点缺少人员：${stage.name}`)
-    if (stage.kind === 'review' && stage.review?.reviewerRoleIds?.length !== 1) throw new Error(`复核节点必须绑定一个复核人员：${stage.name}`)
+    if (stage.kind === 'roles' && stage.roleIds.length === 0) throw new Error(`Execution node is missing a member: ${stage.name}`)
+    if (stage.kind === 'review' && stage.review?.reviewerRoleIds?.length !== 1) throw new Error(`Review node must be assigned one reviewer: ${stage.name}`)
     const roleIds = stage.kind === 'review' ? stage.review?.reviewerRoleIds ?? [] : stage.roleIds
     for (const roleId of roleIds) requireRole(store, chat.id, roleId)
   }
@@ -789,7 +789,7 @@ function findLocalRoleFrameBlocker(
     if (isExternalModelRole(role)) continue
     const binding = deps.runtimeFrames.getByRole(chat.id, role.id)
     if (!binding?.ready) {
-      return { roleId: role.id, roleName: role.name, reason: '人员 iframe 尚未就绪，请先恢复人员' }
+      return { roleId: role.id, roleName: role.name, reason: 'The member iframe is not ready. Please restore the member first' }
     }
   }
   return undefined
@@ -864,7 +864,7 @@ function stopStaleActiveRun(store: OpenTeamStore, chat: GroupChat, run: Orchestr
   run.status = 'stopped'
   run.completedAt = timestamp
   run.updatedAt = timestamp
-  run.error = run.error ?? '运行状态已失效，已自动释放'
+  run.error = run.error ?? 'The run state is no longer valid and has been automatically released'
   for (const stageRun of run.stageRuns) {
     if (stageRun.status === 'running' || stageRun.status === 'pending') {
       stageRun.status = 'skipped'
@@ -963,7 +963,7 @@ function uniqueNumbers(values: number[]): number[] {
 function requireActiveRun(store: OpenTeamStore, chat: GroupChat): OrchestrationRun {
   const runId = store.activeOrchestrationRunIdByChatId[chat.id]
   const run = runId ? store.orchestrationRunsById[runId] : undefined
-  if (!run) throw new Error('该群聊没有运行中的编排')
+  if (!run) throw new Error('This group chat has no running workflow')
   return run
 }
 
@@ -1008,7 +1008,7 @@ function removePendingStageRun(run: OrchestrationRun, stageIndex: number): void 
 
 function firstReviewerRoleId(stage: OrchestrationStage): string {
   const roleId = stage.review?.reviewerRoleIds[0]
-  if (!roleId) throw new Error(`复核节点缺少复核人员：${stage.name}`)
+  if (!roleId) throw new Error(`Review node is missing a reviewer: ${stage.name}`)
   return roleId
 }
 
@@ -1036,7 +1036,7 @@ export function generateTestTrace(store: OpenTeamStore, runId: string): TestRunT
       ) : undefined
       return {
         roleId,
-        roleName: role?.name ?? '未知人员',
+        roleName: role?.name ?? 'Unknown agent',
         input: promptMsg?.content ?? '无输入',
         output: reply?.content ?? roleRun.error ?? '无输出',
         status: roleRun.status,

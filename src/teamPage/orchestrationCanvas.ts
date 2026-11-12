@@ -71,6 +71,7 @@ interface X6Graph {
   addEdge(edge: X6GraphEdge): unknown
   getNodes?(): X6GraphNodeCell[]
   fromJSON?(data: X6GraphData): unknown
+  zoomToFit(options: { padding: number; maxScale: number }): void
   on(eventName: string, handler: (args: { node?: { getData(): Record<string, unknown> }; edge?: X6GraphEdgeEvent }) => void): void
   dispose(): void
 }
@@ -85,7 +86,7 @@ export interface OrchestrationCanvasDependencies {
   rootEl: HTMLElement
   getRoleName(roleId: string): string
   getRoleSiteLabel?(roleId: string): string
-  onStageSelected(stageId: string): void
+  onStageSelected(stageId: string, keyboard?: boolean): void
   onRoleDropped(roleId: string, targetStageId?: string): void
   onGraphChanged?(edges: OrchestrationGraphSnapshot['edges']): void
   loadX6?: LoadX6
@@ -96,6 +97,7 @@ export interface OrchestrationCanvas {
   render(stages: OrchestrationStage[], selectedStageId?: string, graphEdges?: OrchestrationGraphSnapshot['edges']): void
   selectStage(stageId?: string): void
   destroy(): void
+  fitView(): void
 }
 
 export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies): OrchestrationCanvas {
@@ -108,12 +110,12 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
   const loadX6 = deps.loadX6 ?? (async () => await import('@antv/x6') as X6Module)
 
   const handleDragOver = (event: DragEvent): void => {
-    if (!event.dataTransfer?.types.includes('application/x-openteam-role-id')) return
+    if (!event.dataTransfer?.types.includes('application/x-themis-role-id')) return
     event.preventDefault()
   }
 
   const handleDrop = (event: DragEvent): void => {
-    const roleId = event.dataTransfer?.getData('application/x-openteam-role-id')
+    const roleId = event.dataTransfer?.getData('application/x-themis-role-id')
     if (!roleId) return
     event.preventDefault()
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-stage-id]') : undefined
@@ -124,6 +126,7 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
     destroyed = false
     deps.rootEl.addEventListener('dragover', handleDragOver)
     deps.rootEl.addEventListener('drop', handleDrop)
+    deps.rootEl.addEventListener('keydown', activateNode)
     const { Graph } = await loadX6()
     if (destroyed) return
     graph = new Graph({
@@ -187,6 +190,22 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
       deps.onGraphChanged?.(currentEdges)
     })
     render(stages, selectedStageId, graphEdges)
+    fitView()
+  }
+
+  // On narrow screens the whole flow is scaled to fit; wider canvases keep their zoom.
+  function fitView(): void {
+    if (graph && deps.rootEl.clientWidth < 480 && currentStages.length) graph.zoomToFit({ padding: 20, maxScale: 1 })
+  }
+
+  // Nodes are focusable buttons; Enter or Space opens their settings.
+  function activateNode(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    const node = (event.target as Element).closest<HTMLElement>('[data-stage-id][tabindex]')
+    if (node) {
+      event.preventDefault()
+      deps.onStageSelected(node.dataset.stageId as string, true)
+    }
   }
 
   function render(stages: OrchestrationStage[], selectedStageId?: string, graphEdges?: OrchestrationGraphSnapshot['edges']): void {
@@ -237,7 +256,7 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
         const roleLabel = parallelRoleLabel(roleNames)
         const firstSiteLabel = stage.roleIds[0] ? getRoleSiteLabel?.(stage.roleIds[0]).trim() : ''
         const siteLabel = stage.roleIds.length > 1
-          ? `${firstSiteLabel ? `${firstSiteLabel} · ` : ''}${stage.roleIds.length} 人并行`
+          ? `${firstSiteLabel ? `${firstSiteLabel} · ` : ''}${stage.roleIds.length} agents in parallel`
           : firstSiteLabel
         const isReview = stage.kind === 'review'
         const selected = selectedStageId === stage.id
@@ -267,7 +286,7 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
             ],
           },
           attrs: {
-            root: { 'data-stage-id': stage.id },
+            root: { 'data-stage-id': stage.id, tabindex: 0, role: 'button', 'aria-label': stage.name },
             body: {
               fill: 'var(--orchestration-node-bg)',
               stroke: style.stroke,
@@ -295,12 +314,13 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
     destroyed = true
     deps.rootEl.removeEventListener('dragover', handleDragOver)
     deps.rootEl.removeEventListener('drop', handleDrop)
+    deps.rootEl.removeEventListener('keydown', activateNode)
     graph?.dispose()
     graph = undefined
     deps.rootEl.replaceChildren()
   }
 
-  return { mount, render, selectStage, destroy }
+  return { mount, render, selectStage, destroy, fitView }
 }
 
 function buildEdge(edge: OrchestrationGraphSnapshot['edges'][number], stages: OrchestrationStage[]): X6GraphEdge {
@@ -329,8 +349,8 @@ function buildEdge(edge: OrchestrationGraphSnapshot['edges'][number], stages: Or
 }
 
 function parallelRoleLabel(roleNames: string[]): string {
-  if (roleNames.length === 0) return '未选择人员'
-  if (roleNames.length === 1) return roleNames[0] ?? '未选择人员'
+  if (roleNames.length === 0) return 'No agent selected'
+  if (roleNames.length === 1) return roleNames[0] ?? 'No agent selected'
   if (roleNames.length === 2) return roleNames.join(' + ')
   return `${roleNames[0]} +${roleNames.length - 1}`
 }
@@ -364,7 +384,7 @@ function edgeBranchLabel(branch: 'pass' | 'fail'): Record<string, unknown> {
     position: 0.55,
     attrs: {
       label: {
-        text: failBranch ? '不通过' : '通过',
+        text: failBranch ? 'Fail' : 'Pass',
         fill: 'var(--orchestration-edge-label-text)',
         fontSize: 9,
         fontWeight: 720,
@@ -380,7 +400,7 @@ function edgeBranchLabel(branch: 'pass' | 'fail'): Record<string, unknown> {
   }
 }
 
-function reviewEdgeBranch(edge: OrchestrationGraphSnapshot['edges'][number], stages: OrchestrationStage[]): 'pass' | 'fail' | undefined {
+export function reviewEdgeBranch(edge: OrchestrationGraphSnapshot['edges'][number], stages: OrchestrationStage[]): 'pass' | 'fail' | undefined {
   if (edge.sourcePort === 'pass' || edge.sourcePort === 'fail') return edge.sourcePort
   const sourceIndex = stages.findIndex(stage => stage.id === edge.sourceStageId)
   const targetIndex = stages.findIndex(stage => stage.id === edge.targetStageId)
@@ -489,7 +509,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function stageRoleLabel(stage: OrchestrationStage, rolesById: Record<string, GroupRole>): string {
-  return stage.roleIds.map(roleId => rolesById[roleId]?.name ?? '未知人员').join(' + ')
+  return stage.roleIds.map(roleId => rolesById[roleId]?.name ?? 'Unknown agent').join(' + ')
 }
 
 export function arrangeOrchestrationGraph(stages: OrchestrationStage[], edges: OrchestrationGraphSnapshot['edges']): { stages: OrchestrationStage[]; edges: OrchestrationGraphSnapshot['edges'] } {

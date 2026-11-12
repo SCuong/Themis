@@ -1,7 +1,7 @@
 import { getSafeSupportedChatIframeSrcForRole, getSupportedChatOrigin } from '../group/conversationUrl'
 import type { ChatSite, GroupChat, GroupRole } from '../group/types'
 
-export const FRAME_ASSIGN_MESSAGE = 'OPENTEAM_ASSIGN_FRAME_ROLE'
+export const FRAME_ASSIGN_MESSAGE = 'THEMIS_ASSIGN_FRAME_ROLE'
 export const CHAT_IFRAME_ALLOW = 'clipboard-read; clipboard-write; microphone; camera; geolocation; autoplay; fullscreen; picture-in-picture; storage-access; web-share'
 
 export type IframeHostChat = Pick<GroupChat, 'id' | 'name' | 'roleIds'>
@@ -95,7 +95,7 @@ export class IframeHost {
     this.assignIntervalMs = options.assignIntervalMs ?? DEFAULT_ASSIGN_INTERVAL_MS
     this.hostTabId = options.hostTabId
     this.onEvent = options.onEvent
-    this.visibleHost.dataset.openteamIframeHost = 'true'
+    this.visibleHost.dataset.themisIframeHost = 'true'
     options.hiddenHost?.remove()
   }
 
@@ -327,7 +327,6 @@ export class IframeHost {
     iframe.dataset.roleId = role.id
     iframe.dataset.roleKey = roleKey(role.chatId, role.id)
     iframe.setAttribute('user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36')
-    iframe.setAttribute('accept-language', 'zh-CN,zh;q=0.9,en;q=0.8')
     iframe.setAttribute('sec-ch-ua', '"Chromium";v="122", "Google Chrome";v="122"')
     iframe.setAttribute('sec-ch-ua-mobile', '?0')
     iframe.setAttribute('sec-ch-ua-platform', '"Macintosh"')
@@ -432,7 +431,11 @@ export class IframeHost {
   }
 
   private mountRole(record: RoleFrameRecord, group: HTMLElement): void {
-    if (record.shell.parentElement !== group) group.append(record.shell)
+    if (record.shell.parentElement !== group) {
+      group.append(record.shell)
+      // Moving an iframe reloads it, and the reloaded page needs its role assigned again.
+      this.startAssignLoop(record)
+    }
   }
 
   private startAssignLoop(record: RoleFrameRecord): void {

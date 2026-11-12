@@ -16,8 +16,8 @@ const DEFAULT_CLIPBOARD_POLL_MS = 40
 const GEMINI_SELECTORS = {
   editor: 'div.ql-editor[contenteditable="true"], rich-textarea div[contenteditable="true"]',
   sendButton:
-    'button.send-button[aria-label*="发送"], button.send-button[aria-label*="Send"], button[aria-label*="Send message"], button[aria-label*="发送消息"]',
-  response: 'model-response, .model-response-text, message-content',
+    'button.send-button[aria-label*="发送"], button.send-button[aria-label*="Send"], button[aria-label*="Send message"], button[aria-label*="发送消息"], [data-test-id="send-button-container"] .send-button.submit button:has([data-mat-icon-name="arrow_upward"])',
+  response: 'model-response message-content, model-response .model-response-text:not(:has(message-content)):not(message-content *), model-response:not(:has(message-content, .model-response-text))',
   copyButton:
     'button[data-test-id="copy-button"], copy-button button, button[mattooltip="复制回答"], button[aria-label="复制"], button[aria-label*="Copy"], button[aria-label*="复制"]',
   turn: 'model-response',
@@ -75,7 +75,7 @@ export function createGeminiAdapter(options: GeminiAdapterOptions = {}): ChatSit
     if (!autoSend) return
 
     try {
-      const sendButton = await waitForClickableButton(GEMINI_SELECTORS.sendButton, inputTimeoutMs, 'Gemini 发送按钮暂不可用，请稍后重试')
+      const sendButton = await waitForClickableButton(GEMINI_SELECTORS.sendButton, inputTimeoutMs, 'Gemini send button is unavailable. Try again shortly.')
       sendButton.click()
     } catch (error) {
       if (!tryKeyboardSubmit(editor)) throw error
@@ -168,7 +168,7 @@ async function stopGeminiGenerating(): Promise<boolean> {
 }
 
 function findGeminiStopButton(): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping|停止|中止/) && isClickableButton(button))
+  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping|dừng|ngừng/i) && isClickableButton(button))
 }
 
 function tryKeyboardSubmit(editor: HTMLElement): boolean {

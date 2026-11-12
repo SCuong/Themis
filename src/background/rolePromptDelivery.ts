@@ -6,6 +6,7 @@ import { buildPrompt, roleUsesChatGptGptsPersona } from '../group/promptBuilder'
 import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageReference, OpenTeamStore } from '../group/types'
 import type { PromptDelivery } from './promptDelivery'
 import type { RuntimeFrameRegistry } from './runtimeFrames'
+import { promptSignature } from './promptSync'
 
 export interface ExternalPromptDelivery {
   roleId: string
@@ -19,7 +20,6 @@ export interface ExternalPromptDelivery {
 export type PreparedRolePromptDelivery = {
   includesPersona: boolean
   replyAttemptId: string
-  roleHistoryCount: number
 } & (
   | { delivery: PromptDelivery; externalDelivery?: undefined }
   | { delivery?: undefined; externalDelivery: ExternalPromptDelivery }
@@ -39,8 +39,8 @@ export interface PrepareRolePromptDeliveryInput {
 }
 
 export function prepareRolePromptDelivery(input: PrepareRolePromptDeliveryInput): PreparedRolePromptDelivery {
-  const roleHistoryCount = countLocalRoleHistory(input.messages, input.role, input.userMessage.id)
-  const includesPersona = shouldIncludePersonaForPrompt(input.role, roleHistoryCount)
+  const signature = promptSignature(input.store, input.chat, input.role, input.roles)
+  const includesPersona = shouldIncludePersonaForPrompt(input.role, signature)
   const replyAttemptId = input.newId('attempt')
   const responseInstruction = responseInstructionForMessage(input.userMessage, input.store.settings.language)
   const maxContextChars = contextCharBudgetForRole(input.store, input.role)
@@ -51,7 +51,6 @@ export function prepareRolePromptDelivery(input: PrepareRolePromptDeliveryInput)
     if (prompt.memoryPatch) applyExternalMemoryPatch(input.store, prompt.memoryPatch, input.timestamp)
     return {
       includesPersona,
-      roleHistoryCount,
       replyAttemptId,
       externalDelivery: {
         roleId: input.role.id,
@@ -65,7 +64,7 @@ export function prepareRolePromptDelivery(input: PrepareRolePromptDeliveryInput)
   }
 
   const binding = input.runtimeFrames.getByRole(input.chat.id, input.role.id)
-  if (!binding?.ready) throw new Error('人员 iframe 尚未就绪，请先恢复人员')
+  if (!binding?.ready) throw new Error('The member iframe is not ready. Please restore the member first')
   const unsyncedContext = buildUnsyncedContext(input.chat, input.role, input.messages, input.userMessage, maxContextChars, input.store.settings.language)
   const content = buildPrompt({
     chat: input.chat,
@@ -75,13 +74,16 @@ export function prepareRolePromptDelivery(input: PrepareRolePromptDeliveryInput)
     unsyncedContext,
     reference: input.reference,
     includePersona: includesPersona,
+    personaSynced: !includesPersona && !roleUsesChatGptGptsPersona(input.role),
     responseInstruction,
     language: input.store.settings.language,
   })
+  // Committed to role.promptSync once the reply arrives, so a failed send resends the persona.
+  if (includesPersona) input.role.promptSyncPending = { messageId: input.userMessage.id, signature }
+  else delete input.role.promptSyncPending
 
   return {
     includesPersona,
-    roleHistoryCount,
     replyAttemptId,
     delivery: {
       roleId: input.role.id,
@@ -112,7 +114,7 @@ export function getExternalModelForRole(store: OpenTeamStore, role: GroupRole): 
 
 export function requireExternalModelForRole(store: OpenTeamStore, role: GroupRole): ExternalModelConfig {
   const model = getExternalModelForRole(store, role)
-  if (!model) throw new Error(`找不到外部模型：${role.externalModelId ?? role.name}`)
+  if (!model) throw new Error(`External model not found: ${role.externalModelId ?? role.name}`)
   return model
 }
 
@@ -137,18 +139,8 @@ function applyExternalMemoryPatch(store: OpenTeamStore, patch: ExternalMemoryPat
   }
 }
 
-function shouldIncludePersonaForPrompt(role: GroupRole, roleHistoryCount: number): boolean {
-  return !roleUsesChatGptGptsPersona(role) && roleHistoryCount === 0
-}
-
-function countLocalRoleHistory(messages: GroupMessage[], role: GroupRole, currentMessageId: string): number {
-  return messages.filter(message => message.id !== currentMessageId && isRoleHistoryMessage(message, role.id)).length
-}
-
-function isRoleHistoryMessage(message: GroupMessage, roleId: string): boolean {
-  if (message.type !== 'user' || !Array.isArray(message.targetRoleIds) || !message.targetRoleIds.includes(roleId)) return false
-  const deliveryStatus = message.deliveryStatus?.[roleId]
-  return deliveryStatus === 'sent' || deliveryStatus === 'received'
+function shouldIncludePersonaForPrompt(role: GroupRole, signature: string): boolean {
+  return !roleUsesChatGptGptsPersona(role) && role.promptSync?.signature !== signature
 }
 
 function responseInstructionForMessage(message: GroupMessage, language: OpenTeamStore['settings']['language']): string | undefined {

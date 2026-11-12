@@ -4,6 +4,7 @@ import { DEFAULT_MESSAGE_HIGHLIGHT_COLOR, MESSAGE_HIGHLIGHT_COLORS, messageHighl
 import { roleMentionLabel, roleMentionLabelOptionsFromSettings, roleModelLabel } from '../group/mentionParser'
 import type { GroupChat, GroupMessage, GroupRole, MessageHighlight, MessageImageAttachment, MessageReference, OpenTeamStore, OrchestrationReviewResult } from '../group/types'
 import type { ImageAttachmentBlobRecord } from '../shared/imageAttachmentRepository'
+import { normalizeLanguage } from '../shared/i18n'
 import type { TeamPageState } from './appState'
 import { buildChatRenderItems, getChatStartupNotice, getStoppedReplyRoles, getVisibleThinkingRoles, THINKING_TIMEOUT_MS } from './chatExperience'
 
@@ -16,6 +17,8 @@ const MARK_MENU_SELECTION_GAP_PX = 12
 const MARK_MENU_FALLBACK_HEIGHT_PX = 148
 const MARK_MENU_SELECTION_SETTLE_DELAY_MS = 80
 const markdownRenderer = new MarkdownIt({ html: false, linkify: true, breaks: true })
+// composer-files.js renders Markdown attachments with the same parser.
+globalThis.ThemisMarkdownIt = MarkdownIt
 
 export interface MessagesViewDependencies {
   state: TeamPageState
@@ -53,11 +56,11 @@ export interface MessagesView {
 
 function getDiagnosticText(reason: string): string {
   const normalized = reason.toLowerCase()
-  if (normalized === 'send_failed') return '⚠️ 发送失败，请检查 AI 窗口是否开启或尝试刷新页面。'
-  if (normalized === 'response_not_found') return '⚠️ 未检测到回复，可能是 AI 响应过慢或 DOM 结构已变更。'
-  if (normalized === 'timeout') return '⚠️ 回复超时了，请尝试重新发送。'
-  if (normalized === 'site_blocked') return '⚠️ 站点阻断，请检查登录状态或处理 Cookie 弹窗。'
-  return `回复失败：${reason}`
+  if (normalized === 'send_failed') return '⚠️ Failed to send. Check that the AI window is open or try refreshing the page.'
+  if (normalized === 'response_not_found') return '⚠️ No reply detected. The AI may be responding slowly or the DOM structure may have changed.'
+  if (normalized === 'timeout') return '⚠️ Reply timed out. Please try sending again.'
+  if (normalized === 'site_blocked') return '⚠️ Site blocked. Check your login status or handle the Cookie popup.'
+  return `Reply failed:${reason}`
 }
 
 function isStructuredFailureReason(value: string): boolean {
@@ -85,7 +88,25 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     deps.messagesEl.replaceChildren()
 
     if (!chat) {
-      deps.messagesEl.append(deps.emptyCard('选择一个群聊', '左侧群聊列表会显示最近摘要、状态和更新时间。'))
+      const isEnglish = normalizeLanguage(deps.getStore().settings.language) === 'en'
+      const empty = deps.emptyCard(
+        isEnglish ? 'Start a chat' : 'Bắt đầu cuộc trò chuyện',
+        isEnglish ? 'Create a chat and add the AI teammates you want to work with.' : 'Tạo cuộc trò chuyện và thêm các thành viên AI bạn muốn làm việc cùng.',
+      )
+      const create = document.createElement('button')
+      create.type = 'button'
+      create.className = 'btn btn-primary'
+      create.textContent = isEnglish ? 'New chat' : 'Tạo chat'
+      create.addEventListener('click', () => {
+        // On narrow screens the chat list is a drawer: open it first, then the new-chat form.
+        const nav = document.getElementById('toggle-chat-sidebar') as HTMLElement
+        const button = document.getElementById('quick-create-chat') as HTMLElement
+        if (nav.checkVisibility() && nav.getAttribute('aria-expanded') !== 'true') nav.click()
+        if (button.getAttribute('aria-expanded') !== 'true') button.click()
+        else document.getElementById('new-chat-name')!.focus()
+      })
+      empty.querySelector('.empty-card')!.append(create)
+      deps.messagesEl.append(empty)
       return
     }
 
@@ -96,9 +117,9 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
       const roles = deps.getCurrentRoles()
       const startupNotice = getChatStartupNotice(chat, roles)
       if (roles.length === 0) {
-        deps.messagesEl.append(emptyChatPeopleCard('暂无人员', '先添加人员，再开始群聊协作。'))
+        deps.messagesEl.append(emptyChatPeopleCard('No agents yet', 'Add agents first to start collaborating in a group chat.'))
       } else {
-        deps.messagesEl.append(startupNotice ? deps.emptyCard(startupNotice.title, startupNotice.body) : deps.emptyCard('等待第一条消息', '直接发送会记录消息；@ 人员或 @所有人 后触发回复。'))
+        deps.messagesEl.append(startupNotice ? deps.emptyCard(startupNotice.title, startupNotice.body) : deps.emptyCard('Waiting for the first message', 'Send directly to record a message; mention @people or @all to trigger replies.'))
       }
     }
 
@@ -165,7 +186,8 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
     const avatar = document.createElement('div')
     avatar.className = `message-avatar ${messageToneClass(message)}`
-    avatar.textContent = messageAvatarLabel(message)
+    // Members show a portrait (CSS); only the user keeps initials.
+    avatar.textContent = message.type === 'user' ? messageAvatarLabel(message) : ''
     avatar.hidden = !showAvatar
     wireMentionShortcut(avatar, roleForMessage(message))
 
@@ -201,7 +223,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
       if (mentions) appendMentionsToBody(body, mentions)
     }
     if (message.type === 'assistant' && message.status === 'pending' && !message.content.trim()) {
-      body.textContent = '正在回复中 '
+      body.textContent = 'Replying '
     } else if (message.type === 'assistant' && message.status === 'error' && isStructuredFailureReason(message.content)) {
       renderPlainMessageBody(body, getDiagnosticText(message.content))
     } else if (shouldRenderMarkdownMessage(message)) {
@@ -214,6 +236,8 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     if (hasVisibleTextBody) bubble.append(body)
     const imageGrid = renderMessageImageGrid(message)
     if (imageGrid) bubble.append(imageGrid)
+    const files = globalThis.themisComposerFiles?.messageFiles(message)
+    if (files) bubble.append(files)
     const reviewSummary = renderOrchestrationReviewSummary(message)
     if (reviewSummary) bubble.append(reviewSummary)
     if (message.references?.length) bubble.append(referenceBox(message.references[0]))
@@ -223,18 +247,18 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
       tools.className = 'message-tools'
       const role = roleForMessage(message)
       if (message.roleId && message.status === 'pending' && role) {
-        tools.append(createMessageIconButton('停止回复', 'stop', () => deps.stopRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))), { activateOnPointerDown: true }))
+        tools.append(createMessageIconButton('Stop reply', 'stop', () => deps.stopRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))), { activateOnPointerDown: true }))
       } else if (message.roleId && message.status === 'error' && role) {
-        tools.append(createMessageIconButton('重新回复', 'retry', () => deps.retryRoleReply(role, message.id).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))))
+        tools.append(createMessageIconButton('Retry reply', 'retry', () => deps.retryRoleReply(role, message.id).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))))
       } else if (message.roleId && role?.modelSource === 'external') {
-        tools.append(createMessageIconButton('重新回复', 'retry', () => deps.retryRoleReply(role, message.id).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))))
+        tools.append(createMessageIconButton('Retry reply', 'retry', () => deps.retryRoleReply(role, message.id).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))))
       } else if (message.roleId) {
-        tools.append(createMessageIconButton('跳转到原始窗口', 'jump', () => deps.focusRoleFrame(message.chatId, message.roleId)))
-        tools.append(createMessageIconButton('重新同步完整回复', 'retry', () => handleResyncMessage(message)))
+        tools.append(createMessageIconButton('Jump to source window', 'jump', () => deps.focusRoleFrame(message.chatId, message.roleId)))
+        tools.append(createMessageIconButton('Resync full reply', 'retry', () => handleResyncMessage(message)))
       }
       if (message.content.trim()) {
-        tools.append(createMessageIconButton('引用回复', 'quote', () => deps.setReference(message)))
-        tools.append(createMessageIconButton('复制回复', 'copy', button => handleCopyMessage(button, message)))
+        tools.append(createMessageIconButton('Quote reply', 'quote', () => deps.setReference(message)))
+        tools.append(createMessageIconButton('Copy reply', 'copy', button => handleCopyMessage(button, message)))
       }
       bubble.append(tools)
     }
@@ -261,7 +285,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     body.className = 'message-body thinking-dots'
     body.replaceChildren()
     if (!message.content.trim()) {
-      body.textContent = '正在回复中 '
+      body.textContent = 'Replying '
     } else if (shouldRenderMarkdownMessage(message)) {
       renderMarkdownMessageBody(body, message.content)
     } else {
@@ -302,11 +326,11 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
     if (attachment.status === 'error') {
       const errorText = document.createElement('span')
-      errorText.textContent = attachment.error || '图片获取失败'
+      errorText.textContent = attachment.error || 'Failed to fetch image'
       const retry = document.createElement('button')
       retry.type = 'button'
       retry.className = 'message-image-retry'
-      retry.textContent = '重新同步'
+      retry.textContent = 'Sync again'
       retry.addEventListener('click', event => {
         event.stopPropagation()
         handleResyncMessage(message)
@@ -318,17 +342,17 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     const preview = document.createElement('button')
     preview.type = 'button'
     preview.className = 'message-image-preview'
-    preview.setAttribute('aria-label', '预览图片')
+    preview.setAttribute('aria-label', 'Preview image')
     preview.disabled = true
     const image = document.createElement('img')
-    image.alt = attachment.alt || 'ChatGPT 生成图片'
+    image.alt = attachment.alt || 'ChatGPT-generated image'
     image.loading = 'lazy'
     image.decoding = 'async'
     if (attachment.width) image.width = attachment.width
     if (attachment.height) image.height = attachment.height
     preview.append(image)
 
-    const download = createMessageIconButton('下载图片', 'download', () => {
+    const download = createMessageIconButton('Download image', 'download', () => {
       downloadImageAttachment(attachment).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))
     })
     download.classList.add('message-image-download')
@@ -351,7 +375,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
         tile.className = 'message-image-tile message-image-error'
         tile.replaceChildren()
         const errorText = document.createElement('span')
-        errorText.textContent = error instanceof Error ? error.message : '图片读取失败'
+        errorText.textContent = error instanceof Error ? error.message : 'Failed to read image'
         tile.append(errorText)
       })
 
@@ -366,7 +390,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
     const load = (async () => {
       const record = await deps.loadImageAttachment?.(attachmentId)
-      if (!record) throw new Error('本地图片不可用，请重新同步')
+      if (!record) throw new Error('Local image unavailable. Please sync again.')
       const url = URL.createObjectURL(record.blob)
       imageObjectUrls.set(attachmentId, url)
       return url
@@ -379,7 +403,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
   async function downloadImageAttachment(attachment: MessageImageAttachment): Promise<void> {
     const url = await loadImageObjectUrl(attachment.id)
-    if (!url) throw new Error('本地图片不可用，请重新同步')
+    if (!url) throw new Error('Local image unavailable. Please sync again.')
     const anchor = document.createElement('a')
     anchor.href = url
     anchor.download = attachment.fileName || 'chatgpt-image.png'
@@ -500,7 +524,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     deps.state.preserveNextMessageScroll = true
     deps.resyncMessageReply(message)
       .then(() => {
-        deps.showSuccess('执行成功了')
+        deps.showSuccess('Execution succeeded')
       })
       .catch(error => {
         deps.log.warn('ui:message-resync:failed', {
@@ -518,17 +542,17 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
   function showCopyFeedback(button: HTMLButtonElement): void {
     button.classList.add('copied')
-    button.setAttribute('aria-label', '已复制')
+    button.setAttribute('aria-label', 'Copied')
     setMessageButtonIcon(button, 'check')
     window.setTimeout(() => {
       button.classList.remove('copied')
-      button.setAttribute('aria-label', '复制回复')
+      button.setAttribute('aria-label', 'Copy reply')
       setMessageButtonIcon(button, 'copy')
     }, COPY_FEEDBACK_MS)
   }
 
   async function copyMessageContent(message: GroupMessage): Promise<void> {
-    if (!navigator.clipboard?.writeText) throw new Error('当前浏览器不支持复制')
+    if (!navigator.clipboard?.writeText) throw new Error('This browser does not support copying')
     await navigator.clipboard.writeText(message.content)
   }
 
@@ -541,17 +565,17 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
   }
 
   function orchestrationMessageLabelText(message: GroupMessage): string {
-    const parts = ['编排']
-    if (message.orchestrationStageIndex !== undefined) parts.push(`第 ${message.orchestrationStageIndex + 1} 步`)
+    const parts = ['Orchestration']
+    if (message.orchestrationStageIndex !== undefined) parts.push(`No. ${message.orchestrationStageIndex + 1} step`)
     parts.push(orchestrationKindLabel(message.orchestrationKind))
     return parts.join(' · ')
   }
 
   function orchestrationKindLabel(kind: GroupMessage['orchestrationKind']): string {
-    if (kind === 'task') return '任务'
-    if (kind === 'role') return '人员'
-    if (kind === 'review') return '复核'
-    return '状态'
+    if (kind === 'task') return 'Task'
+    if (kind === 'role') return 'agents'
+    if (kind === 'review') return 'Review'
+    return 'Status'
   }
 
   function renderOrchestrationReviewSummary(message: GroupMessage): HTMLElement | undefined {
@@ -560,10 +584,10 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     if (!result) return undefined
     const summary = document.createElement('div')
     summary.className = 'orchestration-review-summary'
-    summary.append(reviewSummaryLine('决策', reviewDecisionLabel(result.decision)))
-    if (result.reason) summary.append(reviewSummaryLine('原因', result.reason))
-    if (result.failedCriteria.length > 0) summary.append(reviewSummaryLine('未通过', result.failedCriteria.join('、')))
-    if (result.nextRoundInstruction) summary.append(reviewSummaryLine('重试说明', result.nextRoundInstruction))
+    summary.append(reviewSummaryLine('Decision', reviewDecisionLabel(result.decision)))
+    if (result.reason) summary.append(reviewSummaryLine('Reason', result.reason))
+    if (result.failedCriteria.length > 0) summary.append(reviewSummaryLine('Failed', result.failedCriteria.join(', ')))
+    if (result.nextRoundInstruction) summary.append(reviewSummaryLine('Retry note', result.nextRoundInstruction))
     return summary
   }
 
@@ -581,7 +605,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     const line = document.createElement('div')
     line.className = 'orchestration-review-line'
     const labelEl = document.createElement('span')
-    labelEl.textContent = `${label}：`
+    labelEl.textContent = `${label}: `
     const valueEl = document.createElement('span')
     valueEl.textContent = value
     line.append(labelEl, valueEl)
@@ -589,8 +613,8 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
   }
 
   function reviewDecisionLabel(decision: OrchestrationReviewResult['decision']): string {
-    if (decision === 'pass') return '通过'
-    return '不通过'
+    if (decision === 'pass') return 'Pass'
+    return 'Fail'
   }
 
   function messageSignature(message: GroupMessage, showName = true, showAvatar = true): string {
@@ -654,7 +678,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     if (message.mentionsAll) {
       const mention = document.createElement('span')
       mention.className = 'message-mention'
-      mention.textContent = '@所有人'
+      mention.textContent = '@all'
       mentions.append(mention)
     }
     for (const role of roles) {
@@ -698,7 +722,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     inner.className = 'message-inner'
     const avatar = document.createElement('div')
     avatar.className = `message-avatar ${deps.roleToneClass(role.name)}`
-    avatar.textContent = deps.roleAvatarLabel(role.name)
+    avatar.textContent = ''
     avatar.hidden = !showAvatar
     wireMentionShortcut(avatar, role)
     const stack = document.createElement('div')
@@ -719,14 +743,14 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     bubble.className = 'message-bubble'
     const body = document.createElement('div')
     body.className = `message-body${stopped ? '' : ' thinking-dots'}`
-    body.textContent = stopped ? '已停止回复' : '正在回复中 '
+    body.textContent = stopped ? 'Reply stopped' : 'Replying '
     bubble.append(body)
     const tools = document.createElement('div')
     tools.className = 'message-tools'
     tools.append(
       stopped
-        ? createMessageIconButton('重新发送', 'retry', () => deps.retryRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))))
-        : createMessageIconButton('停止回复', 'stop', () => deps.stopRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))), { activateOnPointerDown: true }),
+        ? createMessageIconButton('Resend', 'retry', () => deps.retryRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))))
+        : createMessageIconButton('Stop reply', 'stop', () => deps.stopRoleReply(role).catch(error => deps.showError(error instanceof Error ? error.message : String(error))), { activateOnPointerDown: true }),
     )
     bubble.append(tools)
     stack.append(bubble)
@@ -738,7 +762,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
   function referenceBox(reference: MessageReference): HTMLElement {
     const box = document.createElement('div')
     box.className = 'reference-box'
-    box.textContent = `引用 ${reference.roleName || '人员'}：${truncate(reference.contentSnapshot, 160)}`
+    box.textContent = `Quote ${reference.roleName || 'agents'}: ${truncate(reference.contentSnapshot, 160)}`
     return box
   }
 
@@ -748,14 +772,14 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'btn btn-primary'
-    button.textContent = '添加人员'
+    button.textContent = 'Add people'
     button.addEventListener('click', deps.openAddPersonDialog)
     card?.append(button)
     return wrapper
   }
 
   function messageAvatarLabel(message: GroupMessage): string {
-    if (message.type === 'user') return '你'
+    if (message.type === 'user') return 'You'
     return deps.roleAvatarLabel(message.roleName)
   }
 
@@ -776,6 +800,16 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
   function wireMentionShortcut(element: HTMLElement, role: GroupRole | undefined): void {
     if (!role) return
+    // Avatars and names are keyboard shortcuts too: Enter or Space inserts the @mention.
+    element.tabIndex = 0
+    element.setAttribute('role', 'button')
+    element.setAttribute('aria-label', `@${roleMentionLabel(role, mentionLabelOptions())}`)
+    element.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        deps.insertMention(role)
+      }
+    })
     element.classList.add('mention-shortcut')
     element.title = `@${roleMentionLabel(role, mentionLabelOptions())}`
     element.addEventListener('click', event => {
@@ -905,15 +939,15 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     markMenu.className = 'mark-menu'
     const colorRow = document.createElement('div')
     colorRow.className = 'mark-color-row'
-    colorRow.setAttribute('aria-label', '高亮颜色')
+    colorRow.setAttribute('aria-label', 'Highlight color')
     for (const color of MESSAGE_HIGHLIGHT_COLORS) {
       colorRow.append(markColorButton(color.value, color.label))
     }
     markMenu.append(
       colorRow,
-      markMenuButton('高亮', '高亮', () => applySelectedMark('highlight')),
-      markMenuButton('加入笔记', '加入笔记', () => applySelectedMark('note')),
-      markMenuButton('高亮并加入笔记', '高亮并加入笔记', () => applySelectedMark('both')),
+      markMenuButton('Highlight', 'Highlight', () => applySelectedMark('highlight')),
+      markMenuButton('Add to notes', 'Add to notes', () => applySelectedMark('note')),
+      markMenuButton('Highlight and add to notes', 'Highlight and add to notes', () => applySelectedMark('both')),
     )
     document.body.append(markMenu)
     const menuRect = markMenu.getBoundingClientRect()
@@ -946,7 +980,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'mark-color-btn'
-    button.setAttribute('aria-label', `高亮颜色：${label}`)
+    button.setAttribute('aria-label', `Highlight color:${label}`)
     button.setAttribute('aria-pressed', String(selectedMark?.color === color))
     button.style.setProperty('--mark-color-rgb', messageHighlightColorRgb(color))
     button.addEventListener('click', event => {
@@ -993,7 +1027,7 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
   function siteJumpButton(chatId: string, role: GroupRole): HTMLButtonElement | undefined {
     if (role.modelSource === 'external') return undefined
-    const button = createMessageIconButton('跳转到原始窗口', 'jump', () => deps.focusRoleFrame(chatId, role.id))
+    const button = createMessageIconButton('Jump to source window', 'jump', () => deps.focusRoleFrame(chatId, role.id))
     button.classList.add('message-site-jump-btn')
     return button
   }

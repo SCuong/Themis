@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { build as buildWithEsbuild } from 'esbuild'
 import { join, resolve } from 'path'
 import { cpSync, readFileSync, readdirSync } from 'fs'
@@ -20,10 +20,28 @@ export const STATIC_FILES = [
   'NOTICE',
 ]
 
-// Imported by the team page bundle but kept as separate, readable files next to team.js.
-const UNBUNDLED_MODULES: Record<string, string> = {
-  '@themis/team-ui': './team-ui.js',
-  '@themis/profile-avatars': './profile-avatars.js',
+// Hand-written modules the bundles import but that ship as their own files at the extension root.
+// Source imports them by their real path; the output points at the copy in dist/ from each chunk.
+const UNBUNDLED_MODULES = ['localization.js', 'team-ui.js', 'profile-avatars.js']
+const UNBUNDLED_PREFIX = 'themis-root:'
+
+function unbundledModules(): Plugin {
+  return {
+    name: 'unbundled-root-modules',
+    enforce: 'pre',
+    resolveId(source) {
+      const file = source.split('/').pop() ?? ''
+      if (source.startsWith('.') && UNBUNDLED_MODULES.includes(file)) return { id: UNBUNDLED_PREFIX + file, external: true }
+      return undefined
+    },
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== 'chunk') continue
+        const toRoot = chunk.fileName.includes('/') ? '../'.repeat(chunk.fileName.split('/').length - 1) : './'
+        chunk.code = chunk.code.replaceAll(UNBUNDLED_PREFIX, toRoot)
+      }
+    },
+  }
 }
 
 export function hasTopLevelStaticImport(source: string): boolean {
@@ -80,6 +98,7 @@ export default defineConfig(({ mode }) => ({
     __OPENTEAM_DEV__: JSON.stringify(mode === 'development'),
   },
   plugins: [
+    unbundledModules(),
     {
       name: 'safe-lodash-global-root',
       transform(source, id) {
@@ -123,10 +142,10 @@ export default defineConfig(({ mode }) => ({
         background: resolve(__dirname, 'src/background/index.ts'),
         team: resolve(__dirname, 'src/teamPage/index.ts')
       },
-      external: Object.keys(UNBUNDLED_MODULES),
       output: {
         entryFileNames: '[name].js',
-        paths: UNBUNDLED_MODULES,
+        chunkFileNames: 'assets/[name].js',
+        hoistTransitiveImports: false,
       }
     }
   },

@@ -2,6 +2,7 @@ import { normalizeChatGptGptsUrl, normalizeGrokProjectUrl } from './conversation
 import { BUILTIN_ROLE_TEMPLATES, getBuiltinRoleTemplate, isBuiltinRoleTemplateId } from './builtinRoleTemplates'
 import type { ChatSite, GroupChat, GroupRole, OpenTeamStore, RoleModelSource, RoleTemplate } from './types'
 import { localizeRoleTemplate } from '../shared/i18n'
+import { synchronizeCustomRolePersonas } from './customRolePersonas'
 
 export const ROLE_NAME_MAX_CHARACTERS = 50
 
@@ -71,12 +72,12 @@ interface IntlWithSegmenter {
 
 export function validateRoleName(name: string, existingNames: string[] = []): string | undefined {
   const trimmed = name.trim()
-  if (!trimmed) return '人员名称不能为空'
-  if (countUserPerceivedCharacters(trimmed) > ROLE_NAME_MAX_CHARACTERS) return `人员名称不能超过 ${ROLE_NAME_MAX_CHARACTERS} 个字`
-  if (/\s/.test(trimmed)) return '人员名称不能包含空白字符'
-  if (trimmed.includes('@')) return '人员名称不能包含 @'
-  if (trimmed.toLowerCase() === 'all') return '人员名称不能是 all'
-  if (existingNames.some(existingName => existingName.toLowerCase() === trimmed.toLowerCase())) return `人员名称已存在：${trimmed}`
+  if (!trimmed) return 'Enter a person name'
+  if (countUserPerceivedCharacters(trimmed) > ROLE_NAME_MAX_CHARACTERS) return `Person name must be at most ${ROLE_NAME_MAX_CHARACTERS} characters`
+  if (/\s/.test(trimmed)) return 'Person names cannot contain spaces'
+  if (trimmed.includes('@')) return 'Person names cannot contain @'
+  if (trimmed.toLowerCase() === 'all') return 'The name "all" is reserved'
+  if (existingNames.some(existingName => existingName.toLowerCase() === trimmed.toLowerCase())) return `Person name already exists: ${trimmed}`
   return undefined
 }
 
@@ -144,9 +145,9 @@ export function updateRoleTemplate(
   patch: RoleTemplateInput,
   now: number,
 ): RoleTemplate {
-  if (isBuiltinRoleTemplateId(templateId)) throw new Error('系统内置人员不能编辑')
+  if (isBuiltinRoleTemplateId(templateId)) throw new Error('Built-in personas cannot be edited')
   const template = store.roleTemplatesById[templateId]
-  if (!template) throw new Error(`找不到人员库人员：${templateId}`)
+  if (!template) throw new Error(`Person not found in library: ${templateId}`)
 
   template.name = assertValidRoleName(patch.name, [])
   template.defaultModelSource = patch.defaultModelSource === 'external' ? 'external' : 'site'
@@ -178,15 +179,16 @@ export function updateRoleTemplate(
   } else {
     delete template.description
   }
+  synchronizeCustomRolePersonas(store)
 
   return template
 }
 
 export function deleteRoleTemplate(store: OpenTeamStore, templateId: string): void {
-  if (isBuiltinRoleTemplateId(templateId)) throw new Error('系统内置人员不能删除')
+  if (isBuiltinRoleTemplateId(templateId)) throw new Error('Built-in personas cannot be deleted')
   const usage = getRoleTemplateUsage(store, templateId)
   if (usage.usedByChatIds.length > 0) {
-    throw new Error('该人员库人员已被群聊使用，不能删除')
+    throw new Error('This person is used by a chat and cannot be deleted')
   }
 
   delete store.roleTemplatesById[templateId]
@@ -213,10 +215,10 @@ export function createGroupRole(
   now: number,
 ): GroupRole {
   const chat = store.chatsById[input.chatId]
-  if (!chat) throw new Error(`找不到群聊：${input.chatId}`)
+  if (!chat) throw new Error(`Chat not found: ${input.chatId}`)
 
   const template = input.templateId ? getLocalizedRoleTemplateById(store, input.templateId) : undefined
-  if (input.templateId && !template) throw new Error(`找不到人员库人员：${input.templateId}`)
+  if (input.templateId && !template) throw new Error(`Person not found in library: ${input.templateId}`)
 
   const name = assertValidRoleName(input.name ?? template?.name ?? '', [])
   const modelSource = input.modelSource ?? template?.defaultModelSource ?? 'site'
@@ -266,10 +268,10 @@ export function updateGroupRole(
   now: number,
 ): GroupRole {
   const role = store.rolesById[roleId]
-  if (!role) throw new Error(`找不到人员：${roleId}`)
+  if (!role) throw new Error(`Member not found: ${roleId}`)
 
   const chat = store.chatsById[role.chatId]
-  if (!chat) throw new Error(`找不到群聊：${role.chatId}`)
+  if (!chat) throw new Error(`Chat not found: ${role.chatId}`)
 
   const nextName = patch.name !== undefined ? assertValidRoleName(patch.name, []) : role.name
   const nextModelSource = patch.modelSource ?? role.modelSource ?? 'site'
@@ -288,7 +290,7 @@ export function updateGroupRole(
     }
   }
   if (patch.systemPrompt !== undefined) {
-    if (role.createdBy !== 'orchestration-auto' && role.createdBy !== 'orchestration-template') throw new Error('群聊内人员人设不可编辑')
+    if (role.createdBy !== 'orchestration-auto' && role.createdBy !== 'orchestration-template') throw new Error('This member persona cannot be edited')
     const systemPrompt = assertValidSystemPrompt(patch.systemPrompt)
     if (systemPrompt) {
       role.systemPrompt = systemPrompt
@@ -366,10 +368,10 @@ export function createGroupRolesBatch(
   idFactory: () => string,
   now: number,
 ): GroupRole[] {
-  if (items.length === 0) throw new Error('添加人员列表不能为空')
+  if (items.length === 0) throw new Error('Select at least one person to add')
 
   const chat = store.chatsById[chatId]
-  if (!chat) throw new Error(`找不到群聊：${chatId}`)
+  if (!chat) throw new Error(`Chat not found: ${chatId}`)
 
   const prepared = items.map((item, index) => prepareBatchItem(store, item, index))
   const identities = new Set(getChatRoles(store, chat).map(role => roleModelIdentityKey(role.name, role.modelSource ?? 'site', role.chatSite ?? store.settings.defaultChatSite, role.externalModelId)))
@@ -386,7 +388,7 @@ export function createGroupRolesBatch(
 function prepareBatchItem(store: OpenTeamStore, item: GroupRoleBatchInput, index: number): PreparedGroupRoleBatchItem {
   if (item.source === 'library') {
     const template = getRoleTemplateById(store, item.roleTemplateId)
-    if (!template) throw new Error(`找不到人员库人员：${item.roleTemplateId}`)
+    if (!template) throw new Error(`Person not found in library: ${item.roleTemplateId}`)
     const localizedTemplate = localizeRoleTemplate(template, store.settings.language)
     return {
       templateId: item.roleTemplateId,
@@ -415,7 +417,7 @@ function prepareBatchItem(store: OpenTeamStore, item: GroupRoleBatchInput, index
     }
   }
 
-  throw new Error(`第 ${index + 1} 个添加项无效`)
+  throw new Error(`Item ${index + 1} is not valid`)
 }
 
 function getLocalizedRoleTemplateById(store: OpenTeamStore, templateId: string): RoleTemplate | undefined {
@@ -448,13 +450,13 @@ function roleModelIdentityKey(name: string, modelSource: RoleModelSource, chatSi
 
 function duplicateRoleModelMessage(name: string, modelSource: RoleModelSource, chatSite: ChatSite, externalModelId: string | undefined): string {
   return modelSource === 'external'
-    ? `人员已存在：${name}（外部模型 ${externalModelId ?? ''}）`
-    : `人员已存在：${name}（${chatSite}）`
+    ? `A person already exists: ${name} (external model ${externalModelId ?? ''})`
+    : `A person already exists: ${name}(${chatSite})`
 }
 
 function requireExternalModelId(store: OpenTeamStore, value: string | undefined): string {
   const externalModelId = value?.trim()
-  if (!externalModelId || !store.settings.externalModelsById[externalModelId]) throw new Error('请选择有效的外部模型')
+  if (!externalModelId || !store.settings.externalModelsById[externalModelId]) throw new Error('Select a valid external model')
   return externalModelId
 }
 
@@ -471,7 +473,7 @@ function normalizeOptionalChatGptGptsUrl(value: string | undefined): string | un
   const trimmed = value?.trim()
   if (!trimmed) return undefined
   const normalized = normalizeChatGptGptsUrl(trimmed)
-  if (!normalized) throw new Error('GPTs 链接必须是 chatgpt.com/g/... 格式')
+  if (!normalized) throw new Error('Use a GPT link in the form chatgpt.com/g/…')
   return normalized
 }
 
@@ -479,7 +481,7 @@ function normalizeOptionalGrokProjectUrl(value: string | undefined): string | un
   const trimmed = value?.trim()
   if (!trimmed) return undefined
   const normalized = normalizeGrokProjectUrl(trimmed)
-  if (!normalized) throw new Error('Grok 项目链接必须是 grok.com/project/... 格式')
+  if (!normalized) throw new Error('Use a Grok project link in the form grok.com/project/…')
   return normalized
 }
 

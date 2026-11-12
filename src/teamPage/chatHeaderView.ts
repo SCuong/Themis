@@ -28,11 +28,11 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
     const roles = deps.getCurrentRoles()
     const messages = deps.getCurrentMessages()
     if (!chat) {
-      deps.chatTitleEl.textContent = ui('未选择群聊')
-      deps.chatSubtitleEl.textContent = ui('创建或选择一个群聊开始协作')
+      deps.chatTitleEl.textContent = ui('No chat selected')
+      deps.chatSubtitleEl.textContent = ui('Create or select a chat to start collaborating')
       deps.chatStatusEl.className = 'status-pill'
-      deps.chatStatusEl.textContent = ui('空')
-      deps.togglePeopleDrawerEl.textContent = ui('成员 0')
+      deps.chatStatusEl.textContent = ui('Empty')
+      deps.togglePeopleDrawerEl.textContent = ui('Members 0')
       deps.togglePeopleDrawerEl.disabled = true
       deps.openOrchestrationEl.hidden = true
       if (manualMentionToggle) {
@@ -43,12 +43,13 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
     }
 
     deps.chatTitleEl.textContent = chat.name
-    deps.chatSubtitleEl.textContent = roles.length ? ui(`${modeLabel(chat.mode)} · ${roles.length} 位成员 · ${messages.length} 条消息`) : ui('暂无成员')
+    deps.chatTitleEl.title = chat.name
+    deps.chatSubtitleEl.textContent = roles.length ? ui(`${modeLabel(chat.mode)} · ${roles.length} members · ${messages.length} messages`) : ui('No members yet')
     deps.chatStatusEl.className = `status-pill status-${chat.status}`
     deps.chatStatusEl.textContent = ui(chatStatusLabel(chat.status))
     deps.togglePeopleDrawerEl.disabled = false
-    deps.togglePeopleDrawerEl.textContent = ui(`成员 ${roles.length}`)
-    deps.togglePeopleDrawerEl.setAttribute('aria-label', ui(deps.state.peopleDrawerOpen ? '收起成员面板' : '打开成员面板'))
+    deps.togglePeopleDrawerEl.textContent = ui(`Members ${roles.length}`)
+    deps.togglePeopleDrawerEl.setAttribute('aria-label', ui(deps.state.peopleDrawerOpen ? 'Collapse people panel' : 'Open people panel'))
     deps.togglePeopleDrawerEl.setAttribute('aria-expanded', String(deps.state.peopleDrawerOpen))
     deps.openOrchestrationEl.hidden = chat.mode !== 'collaborative'
 
@@ -63,13 +64,13 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
         const plainMessagesReplyAll = current.requireManualMention === false
         await deps.runCommand('GROUP_CHAT_UPDATE', { chatId: current.id, requireManualMention: plainMessagesReplyAll ? true : false })
       })
-      deps.togglePeopleDrawerEl.parentElement?.insertBefore(manualMentionToggle, deps.togglePeopleDrawerEl)
+      document.getElementById('composer-options')?.append(manualMentionToggle)
     }
     manualMentionToggle.hidden = chat.mode !== 'collaborative'
     manualMentionToggle.disabled = false
     const plainMessagesReplyAll = chat.requireManualMention === false
-    const ruleHint = '开启后，普通消息也会触发所有成员回复；关闭后，只有 @ 成员或 @所有人才触发回复'
-    manualMentionToggle.textContent = ui('免@')
+    const ruleHint = 'When on, plain messages ask all members to reply; when off, only @ members or @all trigger replies.'
+    manualMentionToggle.textContent = ui('Everyone replies')
     manualMentionToggle.title = ui(ruleHint)
     manualMentionToggle.setAttribute('aria-label', ui(ruleHint))
     manualMentionToggle.setAttribute('aria-pressed', String(plainMessagesReplyAll))
@@ -84,16 +85,16 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
 }
 
 function modeLabel(mode: RoomMode): string {
-  return mode === 'collaborative' ? '协作群聊模式' : '独立专家模式'
+  return mode === 'collaborative' ? 'Collaborative mode' : 'Independent expert mode'
 }
 
 function chatStatusLabel(status: GroupChat['status']): string {
   const labels: Record<GroupChat['status'], string> = {
-    draft: '草稿',
-    initializing: '初始化中',
-    ready: '进行中',
-    running: '运行中',
-    error: '异常',
+    draft: 'Draft',
+    initializing: 'Initializing',
+    ready: 'Active',
+    running: 'Running',
+    error: 'Error',
   }
   return labels[status]
 }

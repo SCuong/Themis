@@ -1,7 +1,9 @@
 import { BUILTIN_ORCHESTRATION_TEMPLATES, getBuiltinOrchestrationTemplate, type BuiltinOrchestrationTemplate, type OrchestrationTemplateCategory, type OrchestrationTemplateRole } from '../group/orchestrationTemplates'
 import type { ChatSite, ExternalModelConfig, GroupChat, GroupRole, OpenTeamStore, OrchestrationAutoPlanHistoryEntry, OrchestrationFlow, OrchestrationGraphSnapshot, OrchestrationStage } from '../group/types'
 import { DEFAULT_ORCHESTRATION_MAX_NODE_EXECUTIONS, DEFAULT_ORCHESTRATION_REVIEW_MAX_ATTEMPTS, MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS } from '../group/types'
-import { arrangeOrchestrationGraph, createOrchestrationCanvas, type LoadX6, type OrchestrationCanvas } from './orchestrationCanvas'
+import { arrangeOrchestrationGraph, createOrchestrationCanvas, reviewEdgeBranch, type LoadX6, type OrchestrationCanvas } from './orchestrationCanvas'
+import { appendStageConnections } from '../../team-ui.js'
+import { normalizeLanguage } from '../shared/i18n'
 import { runCommandWithReconnect } from './sendWithReconnect'
 
 export interface OrchestrationModalDependencies {
@@ -70,7 +72,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
   let autoPendingUserContent = ''
   let autoStreamingAssistantContent = ''
   const templateManagedRoleIds = new Set<string>()
-  const externalApiRequiredMessage = '编排依赖外部模型 API，请先配置一个外部模型。'
+  const externalApiRequiredMessage = 'Orchestration requires an external model API. Configure an external model first.'
 
   function emptyDraft(): FlowDraft {
     return { task: '', stages: [], graphEdges: [], autoPlanHistory: [], maxNodeExecutions: DEFAULT_ORCHESTRATION_MAX_NODE_EXECUTIONS }
@@ -79,12 +81,12 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
   function open(): void {
     const chat = deps.getCurrentChat()
     if (!chat) {
-      deps.showError('请选择群聊后再编排任务')
+      deps.showError('Select a group chat before orchestrating a task')
       return
     }
     loadDraft(chat)
     deps.orchestrationModalEl.hidden = false
-    deps.openOrchestrationTemplateEl.textContent = '模板'
+    deps.openOrchestrationTemplateEl.textContent = 'Template'
     deps.orchestrationTaskEl.value = draft.task
     deps.orchestrationMaxRoundsEl.value = String(draft.maxNodeExecutions)
     deps.orchestrationMaxRoundsEl.max = String(MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS)
@@ -132,16 +134,18 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       rootEl: deps.orchestrationCanvasEl,
       getRoleName,
       getRoleSiteLabel,
-      onStageSelected(stageId) {
+      onStageSelected(stageId, keyboard) {
         draft.selectedStageId = stageId
         renderStageSettings()
         canvas?.selectStage(stageId)
+        if (keyboard) deps.orchestrationStageSettingsEl.querySelector('select')?.focus()
       },
       onRoleDropped(roleId) {
         addRoleAsStage(roleId)
       },
       onGraphChanged(edges) {
         draft.graphEdges = cloneGraphEdges(edges)
+        renderStageSettings()
       },
       loadX6: deps.loadX6,
     })
@@ -154,7 +158,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (deps.orchestrationModalEl.hidden) return
     draft.maxNodeExecutions = clampMaxNodeExecutions(Number(deps.orchestrationMaxRoundsEl.value || DEFAULT_ORCHESTRATION_MAX_NODE_EXECUTIONS))
     deps.orchestrationHintEl.hidden = draft.stages.length > 0
-    deps.orchestrationHintEl.textContent = '把人员拖到画布生成节点，再从节点端口拖线编排执行关系。'
+    deps.orchestrationHintEl.textContent = document.documentElement.lang === 'en' ? 'Choose a teammate to add a node. Link nodes from their settings or connect their ports.' : 'Chọn thành viên để thêm nút. Nối nút trong phần cài đặt hoặc nối trực tiếp các cổng.'
     renderPeopleList()
     renderStageSettings()
     renderAutoPanel()
@@ -167,16 +171,25 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (roles.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'empty-card compact'
-      empty.textContent = '当前群聊暂无人员，无法编排任务。'
+      empty.textContent = 'This group chat has no agents. Cannot orchestrate a task.'
       deps.orchestrationPeopleListEl.append(empty)
       return
     }
     for (const role of roles) {
-      const card = document.createElement('div')
+      // A button, so a teammate can be added to the canvas without dragging.
+      const card = document.createElement('button')
       card.className = 'orchestration-person'
+      card.type = 'button'
+      card.dataset.roleId = role.id
+      card.title = document.documentElement.lang === 'en' ? `Add ${role.name} to the canvas` : `Thêm ${role.name} vào sơ đồ`
       card.draggable = true
+      card.addEventListener('click', () => {
+        addRoleAsStage(role.id)
+        deps.orchestrationPeopleListEl.querySelector<HTMLElement>(`[data-role-id="${CSS.escape(role.id)}"]`)?.focus({ preventScroll: true })
+        canvas?.fitView()
+      })
       card.addEventListener('dragstart', event => {
-        event.dataTransfer?.setData('application/x-openteam-role-id', role.id)
+        event.dataTransfer?.setData('application/x-themis-role-id', role.id)
       })
       const avatar = document.createElement('span')
       avatar.className = `orchestration-person-avatar ${roleToneClass(role.id)}`
@@ -190,8 +203,9 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       row.append(name, roleSitePill(role))
       const description = document.createElement('span')
       description.className = 'tiny'
-      description.textContent = role.description || '拖到画布创建节点'
-      body.append(row, description)
+      description.textContent = role.description || ''
+      body.append(row)
+      if (role.description) body.append(description)
       card.append(avatar, body)
       deps.orchestrationPeopleListEl.append(card)
     }
@@ -216,10 +230,10 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const heading = document.createElement('div')
     heading.className = 'orchestration-template-heading'
     const title = document.createElement('h3')
-    title.textContent = '从模板开始'
+    title.textContent = 'Start from a template'
     const subtitle = document.createElement('span')
     subtitle.className = 'tiny'
-    subtitle.textContent = '选择后生成草稿，可继续调整。'
+    subtitle.textContent = 'Select a template to generate a draft you can continue editing.'
     heading.append(title, subtitle)
     panel.append(heading)
 
@@ -291,20 +305,20 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const header = document.createElement('div')
     header.className = 'orchestration-node-editor-header'
     const title = document.createElement('h3')
-    title.textContent = selected.kind === 'review' ? '审核节点' : '执行节点'
+    title.textContent = selected.kind === 'review' ? 'Review node' : 'Execution node'
     const closeButton = document.createElement('button')
     closeButton.className = 'icon-btn orchestration-node-editor-close'
     closeButton.type = 'button'
-    closeButton.ariaLabel = '关闭节点设置'
+    closeButton.ariaLabel = 'Close node settings'
     closeButton.textContent = '×'
     closeButton.addEventListener('click', clearSelectedStage)
     header.append(title, closeButton)
     const kindField = document.createElement('label')
     kindField.className = 'field'
-    kindField.textContent = '节点类型'
+    kindField.textContent = 'Node type'
     const kindSelect = document.createElement('select')
     kindSelect.dataset.stageKind = 'true'
-    kindSelect.append(new Option('执行', 'roles'), new Option('审核', 'review'))
+    kindSelect.append(new Option('Execute', 'roles'), new Option('Review', 'review'))
     kindSelect.value = selected.kind
     kindSelect.addEventListener('change', () => {
       setStageKind(selected, kindSelect.value === 'review' ? 'review' : 'roles')
@@ -312,20 +326,20 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     kindField.append(kindSelect)
     const nameField = document.createElement('label')
     nameField.className = 'field'
-    nameField.textContent = '节点名称'
+    nameField.textContent = 'Node name'
     const nameInput = document.createElement('input')
     nameInput.value = selected.name
     nameInput.addEventListener('input', () => {
-      selected.name = nameInput.value.trim() || (selected.kind === 'review' ? '审核' : '执行节点')
+      selected.name = nameInput.value.trim() || (selected.kind === 'review' ? 'Review' : 'Execution node')
       canvas?.render(draft.stages, draft.selectedStageId, draft.graphEdges)
     })
     nameField.append(nameInput)
     const descriptionField = document.createElement('label')
     descriptionField.className = 'field'
-    descriptionField.textContent = '任务描述'
+    descriptionField.textContent = 'Task description'
     const descriptionInput = document.createElement('textarea')
     descriptionInput.value = selected.description ?? ''
-    descriptionInput.placeholder = '给这个节点单独补充任务说明，例如：先澄清目标，只输出优先级和风险。'
+    descriptionInput.placeholder = 'Add instructions for this node, for example: clarify the goal first, then output only priorities and risks.'
     descriptionInput.addEventListener('input', () => {
       const description = descriptionInput.value.trim()
       if (description) selected.description = description
@@ -334,7 +348,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     descriptionField.append(descriptionInput)
     const rolesField = document.createElement('div')
     rolesField.className = 'field'
-    rolesField.textContent = selected.kind === 'review' ? '审核人员' : '执行人员'
+    rolesField.textContent = selected.kind === 'review' ? 'Reviewer' : 'Executor'
     const roles = document.createElement('div')
     roles.className = 'stage-role-chips'
     for (const roleId of selectedRoleIds(selected)) roles.append(roleChip(roleId))
@@ -343,30 +357,43 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const remove = document.createElement('button')
     remove.className = 'btn btn-danger'
     remove.type = 'button'
-    remove.textContent = '删除节点'
+    remove.textContent = 'Delete node'
     remove.addEventListener('click', () => removeStage(selected.id))
     deps.orchestrationStageSettingsEl.append(header, kindField, nameField, descriptionField, rolesField)
     if (autoRoleSiteField) deps.orchestrationStageSettingsEl.append(autoRoleSiteField)
+    // team-ui.js: link this node to others from a list, an alternative to dragging ports on the canvas.
+    appendStageConnections(
+      deps.orchestrationStageSettingsEl,
+      selected,
+      draft.stages,
+      draft.graphEdges,
+      (edges: OrchestrationGraphSnapshot['edges']) => {
+        draft.graphEdges = cloneGraphEdges(edges)
+        canvas?.render(draft.stages, draft.selectedStageId, draft.graphEdges)
+      },
+      normalizeLanguage(deps.getStore().settings.language),
+      (edge: OrchestrationGraphSnapshot['edges'][number]) => selected.kind === 'review' ? reviewEdgeBranch(edge, draft.stages) : undefined,
+    )
     deps.orchestrationStageSettingsEl.append(remove)
 
     if (selected.kind === 'review') renderReviewSettings(selected)
   }
 
   function renderReviewSettings(stage: OrchestrationStage): void {
-    const intro = settingsNote('审核节点由一个群聊人员根据标准判断通过或不通过。')
+    const intro = settingsNote('A review node uses one group chat agent to decide pass or fail against the criteria.')
     const criteriaField = document.createElement('label')
     criteriaField.className = 'field'
-    criteriaField.textContent = '审核标准'
+    criteriaField.textContent = 'Review criteria'
     const criteria = document.createElement('textarea')
     criteria.value = stage.review?.instructions ?? ''
-    criteria.placeholder = '例如：答案需要覆盖风险、方案和下一步行动。未满足时返回 fail。'
+    criteria.placeholder = 'For example: the answer must cover risks, a solution, and next steps. Return fail if these requirements are not met.'
     criteria.addEventListener('input', () => {
       stage.review = normalizedReviewConfig(stage, { instructions: criteria.value })
     })
     criteriaField.append(criteria)
     const attemptsField = document.createElement('label')
     attemptsField.className = 'field'
-    attemptsField.textContent = '最大审核次数'
+    attemptsField.textContent = 'Maximum review attempts'
     const attemptsInput = document.createElement('input')
     attemptsInput.type = 'number'
     attemptsInput.min = '1'
@@ -378,9 +405,9 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     attemptsField.append(attemptsInput)
     const actionField = document.createElement('label')
     actionField.className = 'field'
-    actionField.textContent = '达到上限后'
+    actionField.textContent = 'When the limit is reached'
     const actionSelect = document.createElement('select')
-    actionSelect.append(new Option('停止流程', 'stop'), new Option('继续往下走', 'continue'))
+    actionSelect.append(new Option('Stop workflow', 'stop'), new Option('Continue to the next node', 'continue'))
     actionSelect.value = stage.review?.onMaxAttempts ?? 'stop'
     actionSelect.addEventListener('change', () => {
       stage.review = normalizedReviewConfig(stage, { onMaxAttempts: actionSelect.value === 'continue' ? 'continue' : 'stop' })
@@ -390,9 +417,9 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     preview.className = 'orchestration-json-preview'
     const previewTitle = document.createElement('span')
     previewTitle.className = 'tiny'
-    previewTitle.textContent = '审核返回 JSON 预览'
+    previewTitle.textContent = 'Review response JSON preview'
     const schema = document.createElement('pre')
-    schema.textContent = '{\n  "decision": "pass | fail",\n  "reason": "审核说明",\n  "failedCriteria": [],\n  "nextRoundInstruction": "不通过时的重试说明"\n}'
+    schema.textContent = '{\n  "decision": "pass | fail",\n  "reason": "Review explanation",\n  "failedCriteria": [],\n  "nextRoundInstruction": "Retry instructions if review fails"\n}'
     preview.append(previewTitle, schema)
     deps.orchestrationReviewSettingsEl.append(intro, criteriaField, attemptsField, actionField, preview)
   }
@@ -420,7 +447,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const field = document.createElement('div')
     field.className = 'field orchestration-auto-role-sites'
     const title = document.createElement('span')
-    title.textContent = editableRoles.length > 1 ? '自动人员设置' : '自动人员设置'
+    title.textContent = editableRoles.length > 1 ? 'Generated agent settings' : 'Generated agent settings'
     field.append(title)
 
     for (const role of editableRoles) {
@@ -443,11 +470,11 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       const promptRow = document.createElement('label')
       promptRow.className = 'orchestration-auto-role-prompt-row'
       const promptTitle = document.createElement('span')
-      promptTitle.textContent = `${role.name} 人设提示词`
+      promptTitle.textContent = `${role.name} persona prompt`
       const promptInput = document.createElement('textarea')
       promptInput.className = 'orchestration-auto-role-prompt'
       promptInput.value = role.systemPrompt ?? ''
-      promptInput.placeholder = '只修改自动编排生成的人员人设；已有群成员不会在这里改。'
+      promptInput.placeholder = 'Edit only personas generated by automatic orchestration. Existing group members are not changed here.'
       promptInput.addEventListener('change', () => {
         updateAutoGeneratedRolePrompt(role.id, promptInput.value).catch(error => {
           deps.showError(error instanceof Error ? error.message : String(error))
@@ -462,18 +489,18 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
 
   async function updateAutoGeneratedRoleSite(roleId: string, chatSite: ChatSite): Promise<void> {
     const role = deps.getStore().rolesById[roleId]
-    if (!role || !isGeneratedEditableRole(role)) throw new Error('只有编排生成的人员可以在这里修改站点')
-    if (role.modelSource === 'external') throw new Error('外部模型人员不能切换网页站点')
+    if (!role || !isGeneratedEditableRole(role)) throw new Error('Only agents generated by orchestration can have their site changed here')
+    if (role.modelSource === 'external') throw new Error('External model agents cannot switch web sites')
     await deps.runCommand('GROUP_ROLE_UPDATE', { roleId, patch: { modelSource: 'site', chatSite } })
-    deps.showSuccess('人员站点已更新')
+    deps.showSuccess('Agent site updated')
     render()
   }
 
   async function updateAutoGeneratedRolePrompt(roleId: string, systemPrompt: string): Promise<void> {
     const role = deps.getStore().rolesById[roleId]
-    if (!role || !isGeneratedEditableRole(role)) throw new Error('只有编排生成的人员可以在这里修改人设')
+    if (!role || !isGeneratedEditableRole(role)) throw new Error('Only agents generated by orchestration can have their persona changed here')
     await deps.runCommand('GROUP_ROLE_UPDATE', { roleId, patch: { systemPrompt } })
-    deps.showSuccess('人员人设已更新')
+    deps.showSuccess('Agent persona updated')
     render()
   }
 
@@ -495,12 +522,12 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (stage.kind === kind) return
     stage.kind = kind
     if (kind === 'review') {
-      stage.name = stage.name.trim() || '审核'
+      stage.name = stage.name.trim() || 'Review'
       stage.roleIds = stage.roleIds.slice(0, 1)
       stage.review = normalizedReviewConfig(stage)
     } else {
       delete stage.review
-      stage.name = stage.name.trim() || getRoleName(stage.roleIds[0] ?? '') || '执行'
+      stage.name = stage.name.trim() || getRoleName(stage.roleIds[0] ?? '') || 'Execute'
     }
     render()
   }
@@ -523,6 +550,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     draft.stages = arranged.stages
     draft.graphEdges = arranged.edges
     render()
+    canvas?.fitView()
   }
 
   function openAutoPanel(): void {
@@ -561,7 +589,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (entries.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'orchestration-auto-empty'
-      empty.textContent = '输入你的编排需求，自动编排会像网页对话一样返回结果。'
+      empty.textContent = 'Enter your orchestration requirements. Automatic orchestration will respond as in a web chat.'
       messages.append(empty)
     } else {
       for (const entry of entries) messages.append(renderAutoChatMessage(entry))
@@ -578,7 +606,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const textarea = document.createElement('textarea')
     textarea.className = 'orchestration-auto-input'
     textarea.value = autoInstruction
-    textarea.placeholder = draft.stages.length > 0 ? '继续修改当前编排...' : '输入自动编排需求...'
+    textarea.placeholder = draft.stages.length > 0 ? 'Continue editing the current workflow...' : 'Enter automatic orchestration requirements...'
     textarea.disabled = autoGenerating || saving || running
     textarea.addEventListener('input', () => {
       autoInstruction = textarea.value
@@ -591,7 +619,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const submit = document.createElement('button')
     submit.className = 'btn btn-primary orchestration-auto-submit'
     submit.type = 'submit'
-    submit.textContent = autoGenerating ? '生成中...' : '发送'
+    submit.textContent = autoGenerating ? 'Generating...' : 'Send'
     submit.disabled = autoGenerating || saving || running
     inputShell.append(textarea, submit)
     form.append(inputShell)
@@ -647,7 +675,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const chat = deps.getCurrentChat()
     const template = getBuiltinOrchestrationTemplate(templateId)
     if (!chat || !template) return
-    if (draft.stages.length > 0 && !window.confirm(`用「${template.name}」替换当前画布草稿吗？`)) return
+    if (draft.stages.length > 0 && !window.confirm(`Replace the current canvas draft with “${template.name}”?`)) return
 
     applyingTemplate = true
     updateActionButtons()
@@ -697,9 +725,10 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
         selectedStageId: undefined,
       }
       deps.orchestrationMaxRoundsEl.value = String(draft.maxNodeExecutions)
-      deps.showSuccess(`已套用「${template.name}」模板`)
+      deps.showSuccess(`Applied “${template.name}” template`)
       closeTemplatePicker()
       render()
+      canvas?.fitView()
     } finally {
       applyingTemplate = false
       updateActionButtons()
@@ -767,7 +796,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     const createdRoles = await createTemplateRoles(chat, missingRoles)
     missingRoles.forEach((templateRole, index) => {
       const createdRole = createdRoles[index]
-      if (!createdRole) throw new Error(`模板「${template.name}」缺少人员：${templateRole.name}`)
+      if (!createdRole) throw new Error(`Template “${template.name}” is missing agents:${templateRole.name}`)
       roleIdsByKey.set(templateRole.key, createdRole.id)
     })
     return roleIdsByKey
@@ -786,10 +815,10 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
         chatSite: 'deepseek',
       })),
     })
-    if (response.ok === false) throw new Error(response.error || '创建模板人员失败')
+    if (response.ok === false) throw new Error(response.error || 'Failed to create template agents')
     if (response.store) deps.applyStore(response.store)
     const createdRoles = response.roles ?? findCreatedTemplateRoles(roles)
-    if (createdRoles.length !== roles.length) throw new Error('创建模板人员失败')
+    if (createdRoles.length !== roles.length) throw new Error('Failed to create template agents')
     for (const role of createdRoles) templateManagedRoleIds.add(role.id)
     return createdRoles
   }
@@ -814,7 +843,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       const flow = buildFlow(chat)
       await deps.runCommand('GROUP_ORCHESTRATION_FLOW_SAVE', { chatId: chat.id, flow })
       draft.flowId = flow.id
-      deps.showSuccess('编排流程已保存')
+      deps.showSuccess('Workflow saved')
     } finally {
       saving = false
       updateActionButtons()
@@ -828,7 +857,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (chat && !ensureExternalApiConfigured()) return
     if (!chat || !validateDraft(true)) return
     if (!task) {
-      deps.showError('请输入编排任务')
+      deps.showError('Enter an orchestration task')
       return
     }
     running = true
@@ -837,7 +866,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       const flow = buildFlow(chat)
       await runCommandWithReconnect(deps, { chat, roles: getDraftRoles(), type: 'GROUP_ORCHESTRATION_RUN', payload: { chatId: chat.id, task, flow }, preconnectAll: true })
       draft.flowId = flow.id
-      deps.showSuccess('编排任务已开始')
+      deps.showSuccess('Orchestration task started')
       close()
     } finally {
       running = false
@@ -852,12 +881,12 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     if (!chat) return
     if (!ensureExternalApiConfigured()) return
     if (!task) {
-      deps.showError('请输入编排任务')
+      deps.showError('Enter an orchestration task')
       return
     }
     const instruction = autoInstruction.trim()
     if (draft.stages.length > 0 && !instruction) {
-      deps.showError('请输入自动编排消息')
+      deps.showError('Enter an automatic orchestration message')
       return
     }
     const userContent = instruction || task
@@ -880,10 +909,10 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
       }
       if (flow) payload.flow = flow
       const response = await deps.sendRuntimeMessage('GROUP_ORCHESTRATION_AUTO_GENERATE', payload)
-      if (response.ok === false) throw new Error(response.error || '自动编排失败')
+      if (response.ok === false) throw new Error(response.error || 'Automatic orchestration failed')
       if (response.store) deps.applyStore(response.store)
       const generatedFlow = response.flow
-      if (!generatedFlow) throw new Error('自动编排没有返回流程')
+      if (!generatedFlow) throw new Error('Automatic orchestration did not return a workflow')
       applyGeneratedFlow(generatedFlow)
       clearAutoStreamingState()
       renderAutoPanel()
@@ -897,7 +926,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
 
   function updateActionButtons(): void {
     deps.autoOrchestrationEl.disabled = autoGenerating || saving || running || applyingTemplate
-    deps.autoOrchestrationEl.textContent = autoGenerating ? '生成中...' : '自动编排'
+    deps.autoOrchestrationEl.textContent = autoGenerating ? 'Generating...' : 'Automatic orchestration'
     deps.openOrchestrationTemplateEl.disabled = autoGenerating || saving || running || applyingTemplate
     deps.saveOrchestrationEl.disabled = saving || running || autoGenerating || applyingTemplate
     deps.runOrchestrationEl.disabled = saving || running || autoGenerating || applyingTemplate
@@ -928,7 +957,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     return {
       id: draft.flowId ?? newId('flow'),
       chatId: chat.id,
-      name: `${chat.name} 编排流程`,
+      name: `${chat.name} workflow`,
       description: task || undefined,
       stages,
       graph: {
@@ -945,29 +974,29 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
 
   function validateDraft(requireTask: boolean): boolean {
     if (deps.getCurrentRoles().length === 0) {
-      deps.showError('当前群聊暂无人员，无法编排任务')
+      deps.showError('This group chat has no agents. Cannot orchestrate a task')
       return false
     }
     if (requireTask && !deps.orchestrationTaskEl.value.trim()) {
-      deps.showError('请输入编排任务')
+      deps.showError('Enter an orchestration task')
       return false
     }
     if (draft.stages.length === 0) {
-      deps.showError('请至少添加一个流程节点')
+      deps.showError('Add at least one workflow node')
       return false
     }
     if (draft.stages.some(stage => stage.roleIds.length === 0)) {
-      deps.showError('每个节点都需要至少一个人员')
+      deps.showError('Each node needs at least one agent')
       return false
     }
     const review = draft.stages.find(stage => stage.kind === 'review')
     if (review && (!review.review?.reviewerRoleIds.length || !review.review.instructions?.trim())) {
-      deps.showError('审核节点需要审核人员和审核标准')
+      deps.showError('Review nodes require a reviewer and review criteria')
       return false
     }
     const rawMaxNodeExecutions = Number(deps.orchestrationMaxRoundsEl.value)
     if (!Number.isFinite(rawMaxNodeExecutions) || rawMaxNodeExecutions < 1 || rawMaxNodeExecutions > MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS) {
-      deps.showError(`最大节点执行数需在 1-${MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS} 之间`)
+      deps.showError(`Maximum node executions must be between 1-${MAX_ORCHESTRATION_MAX_NODE_EXECUTIONS} inclusive`)
       return false
     }
     return true
@@ -978,7 +1007,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
   }
 
   function getRoleName(roleId: string): string {
-    return deps.getStore().rolesById[roleId]?.name ?? '未知人员'
+    return deps.getStore().rolesById[roleId]?.name ?? 'Unknown agent'
   }
 
   function getRoleSiteLabel(roleId: string): string {
@@ -1030,27 +1059,27 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
 }
 
 function autoGenerateSuccessMessage(createdCount: number, reusedCount: number): string {
-  if (createdCount > 0 && reusedCount > 0) return `已自动生成编排草稿，复用 ${reusedCount} 个成员，新增 ${createdCount} 个人员`
-  if (createdCount > 0) return `已自动生成编排草稿，新增 ${createdCount} 个人员`
-  return '已自动生成编排草稿，可继续调整后保存或运行'
+  if (createdCount > 0 && reusedCount > 0) return `Workflow draft generated automatically, reusing ${reusedCount} members and adding ${createdCount} agents`
+  if (createdCount > 0) return `Workflow draft generated automatically, adding ${createdCount} agents`
+  return 'Workflow draft generated automatically. Edit it further, then save or run it.'
 }
 
 function templateCategoryLabel(category: OrchestrationTemplateCategory): string {
-  return category === 'structure' ? '编排类型' : '业务场景'
+  return category === 'structure' ? 'Orchestration type' : 'Use case'
 }
 
 function templateCapabilityLabel(capability: string): string {
-  if (capability === 'sequential') return '顺序'
-  if (capability === 'parallel') return '并行'
-  if (capability === 'review') return '审核'
-  if (capability === 'loop') return '循环'
-  if (capability === 'merge') return '汇总'
+  if (capability === 'sequential') return 'Sequential'
+  if (capability === 'parallel') return 'Parallel'
+  if (capability === 'review') return 'Review'
+  if (capability === 'loop') return 'Loop'
+  if (capability === 'merge') return 'Synthesis'
   return capability
 }
 
 function requireTemplateRoleId(roleIdsByKey: Map<string, string>, roleKey: string, templateName: string): string {
   const roleId = roleIdsByKey.get(roleKey)
-  if (!roleId) throw new Error(`模板「${templateName}」缺少人员：${roleKey}`)
+  if (!roleId) throw new Error(`Template “${templateName}” is missing agents:${roleKey}`)
   return roleId
 }
 
@@ -1184,7 +1213,7 @@ function clampReviewAttempts(value: number): number {
 }
 
 function roleInitial(name: string): string {
-  return name.trim().slice(0, 1).toUpperCase() || '员'
+  return name.trim().slice(0, 1).toUpperCase() || 'Agent'
 }
 
 function roleToneClass(seed: string): string {
@@ -1214,7 +1243,7 @@ function editableChatSites(): ChatSite[] {
 }
 
 function externalModelLabel(model: ExternalModelConfig | undefined): string {
-  return model ? `API · ${model.name}` : 'API · 未配置'
+  return model ? `API · ${model.name}` : 'API · Not configured'
 }
 
 function visibleChatSite(site: ChatSite): ChatSite {

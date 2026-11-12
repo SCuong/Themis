@@ -1,4 +1,4 @@
-export const TEAM_PAGE_PRIMARY_LOCK_NAME = 'openteam:team-page:primary'
+export const TEAM_PAGE_PRIMARY_LOCK_NAME = 'themis:team-page:primary'
 
 type LockLike = Record<string, never>
 type LockRequestCallback = (lock: LockLike | null) => Promise<void> | void

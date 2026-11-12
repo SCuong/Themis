@@ -2,7 +2,7 @@ import { normalizeLanguage, translateUi, type TeamLanguage } from '../shared/i18
 
 export interface LanguageSettingsControllerDependencies {
   englishButton: HTMLButtonElement
-  chineseButton: HTMLButtonElement
+  vietnameseButton: HTMLButtonElement
   getLanguage(): TeamLanguage
   runCommand(type: string, payload?: Record<string, unknown>): Promise<void>
   showError(message: string): void
@@ -38,7 +38,7 @@ export function createLanguageSettingsController(deps: LanguageSettingsControlle
   function render(): void {
     const language = pendingLanguage ?? normalizeLanguage(deps.getLanguage())
     deps.englishButton.setAttribute('aria-pressed', String(language === 'en'))
-    deps.chineseButton.setAttribute('aria-pressed', String(language === 'zh-CN'))
+    deps.vietnameseButton.setAttribute('aria-pressed', String(language === 'vi'))
     applyTeamLanguage(language)
   }
 
@@ -46,7 +46,7 @@ export function createLanguageSettingsController(deps: LanguageSettingsControlle
     if (registered) return
     registered = true
     deps.englishButton.addEventListener('click', () => updateLanguage('en'))
-    deps.chineseButton.addEventListener('click', () => updateLanguage('zh-CN'))
+    deps.vietnameseButton.addEventListener('click', () => updateLanguage('vi'))
   }
 
   function updateLanguage(language: TeamLanguage): void {
@@ -126,7 +126,6 @@ function attributeSourcesFor(element: Element): Map<string, string> {
 }
 
 function translateTextNode(source: string, language: TeamLanguage): string {
-  if (language === 'zh-CN') return source
   const leading = source.match(/^\s*/)?.[0] ?? ''
   const trailing = source.match(/\s*$/)?.[0] ?? ''
   const trimmed = source.trim()

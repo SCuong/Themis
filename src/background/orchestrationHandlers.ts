@@ -54,8 +54,8 @@ export function createOrchestrationHandlers(deps: OrchestrationHandlersDependenc
   }
 
   const handleFlowDelete = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const flowId = requireString(message.flowId, '缺少编排流程 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const flowId = requireString(message.flowId, 'Missing workflow ID')
     const { store } = await mutateStore(store => {
       requireChat(store, chatId)
       delete store.orchestrationFlowsById[flowId]
@@ -66,8 +66,8 @@ export function createOrchestrationHandlers(deps: OrchestrationHandlersDependenc
   }
 
   const handleAutoGenerate = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const task = requireString(message.task, '自动编排任务不能为空')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const task = requireString(message.task, 'Automatic workflow planning task cannot be empty')
     const instruction = readOptionalString(message.instruction) ?? task
     const flowId = readOptionalString(message.flowId)
     const currentFlow = isRecord(message.flow) ? requireFlowPayload(message.flow) : undefined
@@ -77,12 +77,12 @@ export function createOrchestrationHandlers(deps: OrchestrationHandlersDependenc
       const roles = getChatRoles(store, chat)
       const plannerModelId = readOptionalString(message.plannerModelId) ?? store.settings.externalModelOrder[0]
       const model = plannerModelId ? store.settings.externalModelsById[plannerModelId] : undefined
-      if (!model) throw new Error('请先配置外部模型后再使用自动编排')
+      if (!model) throw new Error('Please configure an external model before using automatic workflow planning')
       return { chat: { ...chat }, roles: roles.map(role => ({ ...role })), model, store: structuredClone(store) as OpenTeamStore }
     })
 
     const externalModelClient = deps.externalModelClient
-    if (!externalModelClient) throw new Error('自动编排模型客户端不可用')
+    if (!externalModelClient) throw new Error('Automatic workflow planning model client is unavailable')
     const streamId = readOptionalString(message.streamId)
     const emitChunk = streamId
       ? (chunk: string, content: string) => deps.broadcastAutoGenerateStream?.({ type: 'GROUP_ORCHESTRATION_AUTO_STREAM_CHUNK', streamId, chunk, content })
@@ -131,14 +131,14 @@ export function createOrchestrationHandlers(deps: OrchestrationHandlersDependenc
     {
       type: 'GROUP_ORCHESTRATION_RUN',
       handler: async message => {
-        const chatId = requireString(message.chatId, '缺少群聊 ID')
+        const chatId = requireString(message.chatId, 'Missing group chat ID')
         const submittedFlow = isRecord(message.flow) ? requireFlowPayload(message.flow) : undefined
-        if (submittedFlow && submittedFlow.chatId !== chatId) throw new Error('编排流程不属于当前群聊')
-        const flowId = submittedFlow ? (await persistFlowDraft(deps, submittedFlow)).result.id : requireString(message.flowId, '缺少编排流程 ID')
+        if (submittedFlow && submittedFlow.chatId !== chatId) throw new Error('The workflow does not belong to the current group chat')
+        const flowId = submittedFlow ? (await persistFlowDraft(deps, submittedFlow)).result.id : requireString(message.flowId, 'Missing workflow ID')
         const response = await startOrchestrationRun(deps, {
           chatId,
           flowId,
-          task: requireString(message.task ?? message.raw, '编排任务不能为空'),
+          task: requireString(message.task ?? message.raw, 'Workflow task cannot be empty'),
           maxRounds: typeof message.maxRounds === 'number' ? message.maxRounds : submittedFlow?.maxRounds,
           maxNodeExecutions: typeof message.maxNodeExecutions === 'number' ? message.maxNodeExecutions : submittedFlow?.maxNodeExecutions,
         })
@@ -147,23 +147,23 @@ export function createOrchestrationHandlers(deps: OrchestrationHandlersDependenc
     },
     {
       type: 'GROUP_ORCHESTRATION_STOP',
-      handler: async message => ({ ok: true, ...(await stopOrchestrationRun(deps, requireString(message.chatId, '缺少群聊 ID'))) }),
+      handler: async message => ({ ok: true, ...(await stopOrchestrationRun(deps, requireString(message.chatId, 'Missing group chat ID'))) }),
     },
     {
       type: 'GROUP_ORCHESTRATION_RESUME',
-      handler: async message => ({ ok: true, ...(await resumeOrchestrationRun(deps, { chatId: requireString(message.chatId, '缺少群聊 ID'), runId: readOptionalString(message.runId) })) }),
+      handler: async message => ({ ok: true, ...(await resumeOrchestrationRun(deps, { chatId: requireString(message.chatId, 'Missing group chat ID'), runId: readOptionalString(message.runId) })) }),
     },
     {
       type: 'GROUP_ORCHESTRATION_RETRY_STAGE',
-      handler: async message => ({ ok: true, ...(await retryOrchestrationStage(deps, requireString(message.chatId, '缺少群聊 ID'), readOptionalString(message.stageId))) }),
+      handler: async message => ({ ok: true, ...(await retryOrchestrationStage(deps, requireString(message.chatId, 'Missing group chat ID'), readOptionalString(message.stageId))) }),
     },
     {
       type: 'GROUP_ORCHESTRATION_SKIP_STAGE',
-      handler: async message => ({ ok: true, ...(await skipOrchestrationStage(deps, requireString(message.chatId, '缺少群聊 ID'), readOptionalString(message.stageId))) }),
+      handler: async message => ({ ok: true, ...(await skipOrchestrationStage(deps, requireString(message.chatId, 'Missing group chat ID'), readOptionalString(message.stageId))) }),
     },
     {
       type: 'GROUP_ORCHESTRATION_RETRY_REVIEW',
-      handler: async message => ({ ok: true, ...(await retryOrchestrationReview(deps, requireString(message.chatId, '缺少群聊 ID'))) }),
+      handler: async message => ({ ok: true, ...(await retryOrchestrationReview(deps, requireString(message.chatId, 'Missing group chat ID'))) }),
     },
   ]
 }
@@ -246,7 +246,7 @@ function buildFlowFromAutoPlan(
   const stageIdByNodeId = new Map(plan.nodes.map(node => [node.id, `stage-${node.id}`]))
   const stages: OrchestrationStage[] = plan.nodes.map(node => {
     const roleId = roleIdsByKey.get(node.roleKey)
-    if (!roleId) throw new Error(`自动编排节点缺少人员：${node.roleKey}`)
+    if (!roleId) throw new Error(`Automatically planned workflow node is missing a member: ${node.roleKey}`)
     const base = {
       id: stageIdByNodeId.get(node.id) ?? `stage-${node.id}`,
       kind: node.kind === 'review' ? 'review' as const : 'roles' as const,
@@ -255,7 +255,7 @@ function buildFlowFromAutoPlan(
       roleIds: [roleId],
     }
     if (node.kind !== 'review') return base
-    if (!node.review) throw new Error(`自动编排审核节点缺少审核配置：${node.id}`)
+    if (!node.review) throw new Error(`Automatically planned review node is missing review configuration: ${node.id}`)
     return {
       ...base,
       review: {
@@ -269,7 +269,7 @@ function buildFlowFromAutoPlan(
   const edges: OrchestrationGraphSnapshot['edges'] = plan.edges.map(edge => {
     const sourceStageId = stageIdByNodeId.get(edge.from)
     const targetStageId = stageIdByNodeId.get(edge.to)
-    if (!sourceStageId || !targetStageId) throw new Error(`自动编排连线无效：${edge.from} -> ${edge.to}`)
+    if (!sourceStageId || !targetStageId) throw new Error(`Invalid automatically planned workflow edge: ${edge.from} -> ${edge.to}`)
     return {
       sourceStageId,
       targetStageId,
@@ -279,7 +279,7 @@ function buildFlowFromAutoPlan(
   return {
     id: flowId,
     chatId: chat.id,
-    name: plan.flowName || `${chat.name} 自动编排`,
+    name: plan.flowName || `${chat.name} Automatic workflow`,
     description: task || undefined,
     stages,
     graph: { stageNodes: stages, edges },
@@ -304,7 +304,7 @@ async function persistFlowDraft(deps: OrchestrationHandlersDependencies, flow: O
       createdAt: store.orchestrationFlowsById[flow.id]?.createdAt ?? flow.createdAt ?? timestamp,
       updatedAt: timestamp,
     }
-    if (!normalized.name) throw new Error('编排流程名称不能为空')
+    if (!normalized.name) throw new Error('Workflow name cannot be empty')
     store.orchestrationFlowsById[normalized.id] = normalized
     const order = store.orchestrationFlowOrderByChatId[normalized.chatId] ?? []
     store.orchestrationFlowOrderByChatId[normalized.chatId] = order.includes(normalized.id) ? order : [...order, normalized.id]
@@ -313,9 +313,9 @@ async function persistFlowDraft(deps: OrchestrationHandlersDependencies, flow: O
 }
 
 function requireFlowPayload(value: unknown): OrchestrationFlow {
-  if (!isRecord(value)) throw new Error('编排流程格式无效')
-  if (typeof value.id !== 'string' || typeof value.chatId !== 'string' || typeof value.name !== 'string') throw new Error('编排流程格式无效')
-  if (!Array.isArray(value.stages)) throw new Error('编排流程节点格式无效')
+  if (!isRecord(value)) throw new Error('Invalid workflow format')
+  if (typeof value.id !== 'string' || typeof value.chatId !== 'string' || typeof value.name !== 'string') throw new Error('Invalid workflow format')
+  if (!Array.isArray(value.stages)) throw new Error('Invalid workflow node format')
   return value as unknown as OrchestrationFlow
 }
 
@@ -361,7 +361,7 @@ function appendAutoPlanHistory(
 }
 
 function summarizeAutoPlanResult(plan: AutoOrchestrationPlan): string {
-  return `已生成「${plan.flowName || '自动编排流程'}」：${plan.nodes.length} 个节点，${plan.roles.length} 个人员，最大节点执行数 ${plan.maxNodeExecutions}。`
+  return `Generated “${plan.flowName || 'Automatically planned workflow'}”: ${plan.nodes.length} nodes,${plan.roles.length} members, maximum node executions ${plan.maxNodeExecutions}.`
 }
 
 async function streamAutoPlanCompletion(
@@ -376,7 +376,7 @@ async function streamAutoPlanCompletion(
     content += chunk
     await onChunk?.(chunk, content)
   }
-  if (!content.trim()) throw new Error('外部模型返回格式无效')
+  if (!content.trim()) throw new Error('Invalid response format from the external model')
   return { content }
 }
 

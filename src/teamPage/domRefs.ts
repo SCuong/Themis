@@ -1,6 +1,5 @@
 export interface TeamPageDomRefs {
   appShellEl: HTMLElement
-  closeWindowEl: HTMLButtonElement
   toggleWindowSizeEl: HTMLButtonElement
   toggleFullscreenEl: HTMLButtonElement
   storeSummaryEl: HTMLElement
@@ -34,9 +33,7 @@ export interface TeamPageDomRefs {
   settingsButtonEl: HTMLButtonElement
   settingsMenuEl: HTMLElement
   languageEnEl: HTMLButtonElement
-  languageZhEl: HTMLButtonElement
-  agentControlToggleEl: HTMLButtonElement
-  agentControlStatusEl: HTMLElement
+  languageViEl: HTMLButtonElement
   themeLightEl: HTMLButtonElement
   themeDarkEl: HTMLButtonElement
   openAllNotesEl: HTMLButtonElement
@@ -164,7 +161,6 @@ export function requireElement<T extends Element>(selector: string): T {
 export function createTeamPageDomRefs(): TeamPageDomRefs {
   return {
     appShellEl: requireElement<HTMLElement>('#app'),
-    closeWindowEl: requireElement<HTMLButtonElement>('#close-window'),
     toggleWindowSizeEl: requireElement<HTMLButtonElement>('#toggle-window-size'),
     toggleFullscreenEl: requireElement<HTMLButtonElement>('#toggle-fullscreen'),
     storeSummaryEl: requireElement<HTMLElement>('#store-summary'),
@@ -198,9 +194,7 @@ export function createTeamPageDomRefs(): TeamPageDomRefs {
     settingsButtonEl: requireElement<HTMLButtonElement>('#settings-button'),
     settingsMenuEl: requireElement<HTMLElement>('#settings-menu'),
     languageEnEl: requireElement<HTMLButtonElement>('#language-en'),
-    languageZhEl: requireElement<HTMLButtonElement>('#language-zh'),
-    agentControlToggleEl: requireElement<HTMLButtonElement>('#agent-control-toggle'),
-    agentControlStatusEl: requireElement<HTMLElement>('#agent-control-status'),
+    languageViEl: requireElement<HTMLButtonElement>('#language-vi'),
     themeLightEl: requireElement<HTMLButtonElement>('#theme-light'),
     themeDarkEl: requireElement<HTMLButtonElement>('#theme-dark'),
     openAllNotesEl: requireElement<HTMLButtonElement>('#open-all-notes'),

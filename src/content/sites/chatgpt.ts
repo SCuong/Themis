@@ -13,10 +13,10 @@ const DEFAULT_CLIPBOARD_TIMEOUT_MS = 900
 const DEFAULT_CLIPBOARD_POLL_MS = 40
 
 const CHATGPT_SELECTORS = {
-  editor: 'form[data-type="unified-composer"] #prompt-textarea[contenteditable="true"], #prompt-textarea.ProseMirror[contenteditable="true"]',
+  editor: 'form[data-type="unified-composer"] #prompt-textarea[contenteditable="true"], #prompt-textarea.ProseMirror[contenteditable="true"], form[data-chatgpt-composer] .ProseMirror[contenteditable="true"][data-composer-markdown]',
   sendButton:
     'button[data-testid="send-button"], button[aria-label*="发送"], button[aria-label*="Send"], button[aria-label*="提交"], button[aria-label*="Submit"]',
-  response: '[data-message-author-role="assistant"]',
+  response: '[data-message-author-role="assistant"], [data-markdown-text-style="assistant-message"]',
   imageResponse: '[data-conversation-screenshot-content]',
   generatedImage:
     'img[src*="/backend-api/estuary/content"], [data-testid*="image"] img[src], [class*="imagegen-image"] img[src]',
@@ -87,7 +87,7 @@ export function createChatGptAdapter(options: ChatGptAdapterOptions = {}): ChatS
 
     if (!autoSend) return
 
-    const sendButton = await waitForClickableButton(CHATGPT_SELECTORS.sendButton, inputTimeoutMs, 'ChatGPT 发送按钮暂不可用，请稍后重试')
+    const sendButton = await waitForClickableButton(CHATGPT_SELECTORS.sendButton, inputTimeoutMs, 'ChatGPT send button is unavailable. Try again shortly.')
     sendButton.click()
   }
 
@@ -232,7 +232,7 @@ async function stopChatGptGenerating(): Promise<boolean> {
 }
 
 function findChatGptStopButton(): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping|停止|中止/) && isClickableButton(button) && isVisibleInteractiveElement(button))
+  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(button => buttonLabelMatches(button, /stop|stopping/) && isClickableButton(button) && isVisibleInteractiveElement(button))
 }
 
 function findChatGptActivityIndicator(): Element | undefined {
@@ -250,7 +250,7 @@ function hasShortThinkingStatus(scope: Element): boolean {
     if (!isVisibleOrDocumentedIndicator(element)) return false
     const text = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim()
     if (!text || text.length > 80) return false
-    return /^(正在)?思考中?[。.．…\s]*$|^thinking[.\s…]*$|^reasoning[.\s…]*$/i.test(text)
+    return /^thinking[.\s…]*$|^reasoning[.\s…]*$/i.test(text)
   })
 }
 

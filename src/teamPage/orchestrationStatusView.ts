@@ -51,13 +51,13 @@ interface DiagramNode {
 }
 
 const STATUS_LABELS: Record<OrchestrationRun['status'], string> = {
-  pending: '编排等待中',
-  running: '编排运行中',
-  completed: '编排已完成',
-  stopped: '编排已停止',
-  error: '编排出错',
+  pending: 'Orchestration waiting',
+  running: 'Orchestration running',
+  completed: 'Orchestration completed',
+  stopped: 'Orchestration stopped',
+  error: 'Orchestration error',
 }
-const FLOATING_PREFS_KEY_PREFIX = 'openteam.orchestrationFloatingStatus.'
+const FLOATING_PREFS_KEY_PREFIX = 'themis.orchestrationFloatingStatus.'
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const DEFAULT_CARD_WIDTH = 390
 const DEFAULT_CARD_HEIGHT = 376
@@ -88,9 +88,9 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     button.type = 'button'
     button.className = `orchestration-status orchestration-status-floating orchestration-status-collapsed orchestration-status-${run.status}`
     const label = `${STATUS_LABELS[run.status]} · ${currentNodeText(run, flow)} · ${run.stageRuns.length} / ${maxExecutions(run)}`
-    button.textContent = '编'
+    button.textContent = 'Flow'
     button.title = label
-    button.setAttribute('aria-label', `${label}，点击展开`)
+    button.setAttribute('aria-label', `${label}, click to expand`)
     button.addEventListener('click', () => {
       const nextPrefs = { ...readPrefs(chat.id), collapsed: false }
       writePrefs(chat.id, nextPrefs)
@@ -104,7 +104,7 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const card = document.createElement('section')
     card.className = `orchestration-status orchestration-status-floating orchestration-status-${run.status}`
     card.dataset.runId = run.id
-    card.setAttribute('aria-label', '编排运行状态')
+    card.setAttribute('aria-label', 'Orchestration run status')
     applyFloatingPosition(card, prefs, { width: DEFAULT_CARD_WIDTH, height: DEFAULT_CARD_HEIGHT })
 
     const header = document.createElement('div')
@@ -120,7 +120,7 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     if (run.status === 'running' && run.updatedAt) {
       const staleThreshold = 10 * 60 * 1000
       if (Date.now() - run.updatedAt > staleThreshold) {
-        statusLabel = '编排运行超时'
+        statusLabel = 'Orchestration timed out'
       }
     }
     titleText.textContent = statusLabel
@@ -131,15 +131,15 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     headerActions.className = 'orchestration-status-window-actions'
     const statusActions = renderActions(chat, run, flow, current)
     if (statusActions) headerActions.append(statusActions)
-    const collapse = actionButton('－', 'orchestration-status-collapse', () => {
+    const collapse = actionButton('−', 'orchestration-status-collapse', () => {
       const nextPrefs = { ...readPrefs(chat.id), collapsed: true }
       writePrefs(chat.id, nextPrefs)
       card.replaceWith(renderCollapsed(chat, run, flow, nextPrefs))
     })
-    collapse.setAttribute('aria-label', '收起编排状态')
+    collapse.setAttribute('aria-label', 'Collapse orchestration status')
     headerActions.append(collapse)
     if (run.status === 'running' || run.status === 'pending') {
-      headerActions.append(actionButton('停止', 'btn-danger', () => runAction('GROUP_ORCHESTRATION_STOP', { chatId: chat.id })))
+      headerActions.append(actionButton('Stop', 'btn-danger', () => runAction('GROUP_ORCHESTRATION_STOP', { chatId: chat.id })))
     }
     header.append(headerActions)
     card.append(header)
@@ -156,7 +156,7 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const resizeHandle = document.createElement('button')
     resizeHandle.type = 'button'
     resizeHandle.className = 'orchestration-status-resize'
-    resizeHandle.setAttribute('aria-label', '调整编排状态大小')
+    resizeHandle.setAttribute('aria-label', 'Resize orchestration status')
     makeResizable(card, resizeHandle, chat.id)
     card.append(body, resizeHandle)
     return card
@@ -170,11 +170,11 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const value = document.createElement('strong')
     value.textContent = `${run.stageRuns.length} / ${maxExecutions(run)}`
     const label = document.createElement('span')
-    label.textContent = '已执行节点数'
+    label.textContent = 'Nodes executed'
     count.append(value, label)
     const node = document.createElement('div')
     node.className = 'orchestration-status-node-index'
-    node.textContent = `节点 ${current ? current.stageIndex + 1 : Math.min(run.stageRuns.length + 1, flow.stages.length)} / ${Math.max(1, flow.stages.length)}`
+    node.textContent = `Node ${current ? current.stageIndex + 1 : Math.min(run.stageRuns.length + 1, flow.stages.length)} / ${Math.max(1, flow.stages.length)}`
     row.append(count, node)
     return row
   }
@@ -187,10 +187,10 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     panel.className = 'orchestration-status-current'
     const eyebrow = document.createElement('div')
     eyebrow.className = 'orchestration-status-current-label'
-    eyebrow.textContent = current.status === 'error' ? '失败节点' : '当前节点'
+    eyebrow.textContent = current.status === 'error' ? 'Failed node' : 'Current node'
     const main = document.createElement('div')
     main.className = 'orchestration-status-current-main'
-    main.textContent = stage.kind === 'review' ? `审核 · ${stageStatusLabel(stage, rolesById(), deps.getStore())}` : stageStatusLabel(stage, rolesById(), deps.getStore())
+    main.textContent = stage.kind === 'review' ? `Review · ${stageStatusLabel(stage, rolesById(), deps.getStore())}` : stageStatusLabel(stage, rolesById(), deps.getStore())
     const sub = document.createElement('div')
     sub.className = 'orchestration-status-current-sub'
     sub.textContent = stage.description?.trim() || currentStatusText(current)
@@ -199,9 +199,9 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
       const meta = document.createElement('div')
       meta.className = 'orchestration-status-review-meta'
       const attempts = document.createElement('span')
-      attempts.textContent = `审核次数 ${reviewAttemptCount(run, stage.id)} / ${reviewMaxAttempts(stage)}`
+      attempts.textContent = `Review attempts ${reviewAttemptCount(run, stage.id)} / ${reviewMaxAttempts(stage)}`
       const action = document.createElement('span')
-      action.textContent = stage.review?.onMaxAttempts === 'continue' ? '上限后：继续往下走' : '上限后：停止流程'
+      action.textContent = stage.review?.onMaxAttempts === 'continue' ? 'After limit: continue to the next node' : 'After limit: stop workflow'
       meta.append(attempts, action)
       panel.append(meta)
     }
@@ -217,9 +217,9 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const panel = document.createElement('div')
     panel.className = 'orchestration-status-waiting'
     const label = document.createElement('span')
-    label.textContent = '等待'
+    label.textContent = 'Wait'
     const value = document.createElement('strong')
-    value.textContent = waiting.join('、')
+    value.textContent = waiting.join(', ')
     panel.append(label, value)
     return panel
   }
@@ -228,24 +228,24 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const actions = document.createElement('div')
     actions.className = 'orchestration-status-actions'
     if (run.status === 'stopped') {
-      actions.append(actionButton('继续', 'btn-primary', () => resumeAction(chat, run, flow)))
-      actions.append(actionButton('重新运行', 'btn-ghost', () => rerunAction(chat, run, flow)))
+      actions.append(actionButton('Continue', 'btn-primary', () => resumeAction(chat, run, flow)))
+      actions.append(actionButton('Run again', 'btn-ghost', () => rerunAction(chat, run, flow)))
     }
     if (run.status === 'completed') {
-      actions.append(actionButton('重新运行', 'btn-primary', () => rerunAction(chat, run, flow)))
+      actions.append(actionButton('Run again', 'btn-primary', () => rerunAction(chat, run, flow)))
     }
     if ((run.status === 'error' || current?.status === 'error') && current) {
       if (current.kind === 'review') {
-        actions.append(actionButton('重发', 'btn-primary', () => retryAction(chat, current, 'GROUP_ORCHESTRATION_RETRY_REVIEW', { chatId: chat.id })))
+        actions.append(actionButton('Resend', 'btn-primary', () => retryAction(chat, current, 'GROUP_ORCHESTRATION_RETRY_REVIEW', { chatId: chat.id })))
       } else {
-        actions.append(actionButton('重发', 'btn-primary', () => retryAction(chat, current, 'GROUP_ORCHESTRATION_RETRY_STAGE', { chatId: chat.id, stageId: current.stageId })))
+        actions.append(actionButton('Resend', 'btn-primary', () => retryAction(chat, current, 'GROUP_ORCHESTRATION_RETRY_STAGE', { chatId: chat.id, stageId: current.stageId })))
       }
-      actions.append(actionButton('跳过节点', 'btn-ghost', () => runAction('GROUP_ORCHESTRATION_SKIP_STAGE', { chatId: chat.id, stageId: current.stageId })))
-      actions.append(actionButton('重新运行', 'btn-ghost', () => rerunAction(chat, run, flow)))
+      actions.append(actionButton('Skip node', 'btn-ghost', () => runAction('GROUP_ORCHESTRATION_SKIP_STAGE', { chatId: chat.id, stageId: current.stageId })))
+      actions.append(actionButton('Run again', 'btn-ghost', () => rerunAction(chat, run, flow)))
     }
 
     if (run.status === 'running' && run.updatedAt && (Date.now() - run.updatedAt > 10 * 60 * 1000)) {
-      actions.append(actionButton('强制重置', 'btn-danger', () => runAction('GROUP_ORCHESTRATION_STOP', { chatId: chat.id })))
+      actions.append(actionButton('Force reset', 'btn-danger', () => runAction('GROUP_ORCHESTRATION_STOP', { chatId: chat.id })))
     }
     return actions.childElementCount > 0 ? actions : undefined
   }
@@ -330,7 +330,7 @@ function renderMiniFlow(run: OrchestrationRun, flow: OrchestrationFlow, store: O
   const svg = svgEl('svg')
   svg.classList.add('orchestration-mini-flow')
   svg.setAttribute('role', 'img')
-  svg.setAttribute('aria-label', '编排流程示意图')
+  svg.setAttribute('aria-label', 'Workflow diagram')
   const nodes = diagramNodes(flow)
   const edges = graphEdges(flow)
   const bounds = diagramBounds(nodes, edges)
@@ -430,7 +430,7 @@ function edgeLabel(source: DiagramNode, target: DiagramNode, edge: Orchestration
   text.setAttribute('x', String(middle.x))
   text.setAttribute('y', String(middle.y + 3))
   text.setAttribute('text-anchor', 'middle')
-  text.textContent = branch === 'pass' ? '通过' : '不通过'
+  text.textContent = branch === 'pass' ? 'Pass' : 'Fail'
   group.append(rect, text)
   return group
 }
@@ -511,15 +511,15 @@ function currentStageRun(run: OrchestrationRun): OrchestrationStageRun | undefin
 function currentNodeText(run: OrchestrationRun, flow: OrchestrationFlow): string {
   const current = currentStageRun(run)
   const stage = current ? flow.stages[current.stageIndex] : undefined
-  return stage?.kind === 'review' ? '审核' : stage?.name ?? '未开始'
+  return stage?.kind === 'review' ? 'Review' : stage?.name ?? 'Not started'
 }
 
 function currentStatusText(current: OrchestrationStageRun): string {
-  if (current.status === 'running') return current.kind === 'review' ? '正在判断流程走向' : '正在执行'
-  if (current.status === 'error') return current.kind === 'review' ? '审核失败' : '节点失败'
-  if (current.status === 'skipped') return '已停止，等待继续'
-  if (current.status === 'completed') return '已完成'
-  return '等待执行'
+  if (current.status === 'running') return current.kind === 'review' ? 'Determining the next workflow step' : 'Executing'
+  if (current.status === 'error') return current.kind === 'review' ? 'Review failed' : 'Node failed'
+  if (current.status === 'skipped') return 'Stopped, waiting to continue'
+  if (current.status === 'completed') return 'Completed'
+  return 'Waiting to execute'
 }
 
 function getVisibleRun(store: OpenTeamStore, chatId: string): VisibleRun | undefined {
@@ -535,7 +535,7 @@ function getVisibleRun(store: OpenTeamStore, chatId: string): VisibleRun | undef
 function stageStatusLabel(stage: OrchestrationStage, rolesById: Map<string, GroupRole>, store: OpenTeamStore): string {
   const roleIds = stage.kind === 'review' ? stage.review?.reviewerRoleIds ?? stage.roleIds : stage.roleIds
   const roleLabels = roleIds.map(roleId => roleStatusLabel(rolesById.get(roleId), roleId, store))
-  return roleLabels.length > 0 ? roleLabels.join('、') : stage.name
+  return roleLabels.length > 0 ? roleLabels.join(', ') : stage.name
 }
 
 function miniNodeLines(stage: OrchestrationStage, store: OpenTeamStore, rolesById: Map<string, GroupRole>, run: OrchestrationRun): string[] {
@@ -544,13 +544,13 @@ function miniNodeLines(stage: OrchestrationStage, store: OpenTeamStore, rolesByI
   const name = firstRole?.name ?? stage.name
   const site = firstRole ? roleModelLabel(firstRole, store) : ''
   if (stage.kind === 'review') return [name, site, reviewAttemptText(run, stage)].filter(Boolean)
-  if (roleIds.length > 1) return [name, `${roleIds.length} 人 · ${site}`].filter(Boolean)
+  if (roleIds.length > 1) return [name, `${roleIds.length} agents · ${site}`].filter(Boolean)
   return [name, site].filter(Boolean)
 }
 
 function roleStatusLabel(role: GroupRole | undefined, fallbackId: string, store: OpenTeamStore): string {
   if (!role) return fallbackId
-  return `${role.name}（${roleModelLabel(role, store)}）`
+  return `${role.name}(${roleModelLabel(role, store)})`
 }
 
 function roleModelLabel(role: Pick<GroupRole, 'modelSource' | 'externalModelId' | 'chatSite'>, store: OpenTeamStore): string {

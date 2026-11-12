@@ -1,4 +1,4 @@
-const IMAGE_ATTACHMENT_DATABASE = 'openteam.imageAttachments'
+const IMAGE_ATTACHMENT_DATABASE = 'themis.imageAttachments'
 const IMAGE_ATTACHMENT_DATABASE_VERSION = 1
 const IMAGE_STORE = 'images'
 const CHAT_ID_INDEX = 'chatId'
@@ -29,7 +29,7 @@ export function createIndexedDbImageAttachmentRepository(factory?: IDBFactory): 
 
   function getDatabase(): Promise<IDBDatabase> {
     const selectedFactory = factory ?? globalThis.indexedDB
-    if (!selectedFactory) return Promise.reject(new Error('当前环境不支持图片存储'))
+    if (!selectedFactory) return Promise.reject(new Error('Image storage is unavailable'))
     databasePromise ??= openDatabase(selectedFactory)
     return databasePromise
   }
@@ -104,28 +104,29 @@ function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
       if (!store.indexNames.contains(MESSAGE_ID_INDEX)) store.createIndex(MESSAGE_ID_INDEX, MESSAGE_ID_INDEX)
     })
     request.addEventListener('success', () => resolve(request.result))
-    request.addEventListener('error', () => reject(request.error ?? new Error('无法打开图片存储')))
-    request.addEventListener('blocked', () => reject(new Error('图片存储升级被阻止')))
+    request.addEventListener('error', () => reject(request.error ?? new Error('Could not open image storage')))
+    request.addEventListener('blocked', () => reject(new Error('The image storage upgrade was blocked')))
   })
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.addEventListener('success', () => resolve(request.result))
-    request.addEventListener('error', () => reject(request.error ?? new Error('图片存储请求失败')))
+    request.addEventListener('error', () => reject(request.error ?? new Error('Image storage request failed')))
   })
 }
 
 function transactionDone(transaction: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     transaction.addEventListener('complete', () => resolve())
-    transaction.addEventListener('abort', () => reject(transaction.error ?? new Error('图片存储事务已中止')))
-    transaction.addEventListener('error', () => reject(transaction.error ?? new Error('图片存储事务失败')))
+    transaction.addEventListener('abort', () => reject(transaction.error ?? new Error('Image storage transaction was aborted')))
+    transaction.addEventListener('error', () => reject(transaction.error ?? new Error('Image storage transaction failed')))
   })
 }
 
 function deleteIndexMatches(index: IDBIndex, key: IDBValidKey): void {
-  const request = index.openKeyCursor(IDBKeyRange.only(key))
+  // A key cursor cannot delete records, so this needs a value cursor.
+  const request = index.openCursor(IDBKeyRange.only(key))
   request.addEventListener('success', () => {
     const cursor = request.result
     if (!cursor) return

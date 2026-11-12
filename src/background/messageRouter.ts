@@ -19,5 +19,5 @@ export function createMessageRouter(routes: BackgroundMessageRoute[], fallback: 
 }
 
 function defaultFallback(): { ok: false; error: string } {
-  return { ok: false, error: 'Unknown OpenTeam message' }
+  return { ok: false, error: 'Unknown Themis message' }
 }

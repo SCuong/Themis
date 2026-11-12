@@ -1,5 +1,6 @@
 import type { ExternalModelConfig, ExternalModelFormat, OpenTeamStore } from '../group/types'
 import { normalizeLanguage, translateUi } from '../shared/i18n'
+import { requestModelAccess } from './modelAccess'
 
 export interface ExternalModelsViewDependencies {
   getStore(): OpenTeamStore
@@ -46,7 +47,7 @@ export function createExternalModelsView(deps: ExternalModelsViewDependencies): 
     if (models.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'empty-card'
-      empty.textContent = ui('暂无外部模型')
+      empty.textContent = ui('No external models yet')
       deps.externalModelsListEl.append(empty)
       return
     }
@@ -75,17 +76,17 @@ export function createExternalModelsView(deps: ExternalModelsViewDependencies): 
     const edit = document.createElement('button')
     edit.type = 'button'
     edit.className = 'btn btn-ghost'
-    edit.textContent = ui('编辑')
+    edit.textContent = ui('Edit')
     edit.addEventListener('click', () => fillForm(model))
     const test = document.createElement('button')
     test.type = 'button'
     test.className = 'btn btn-ghost'
-    test.textContent = ui('测试')
+    test.textContent = ui('Test')
     test.addEventListener('click', () => testModel(model, test))
     const remove = document.createElement('button')
     remove.type = 'button'
     remove.className = 'btn btn-danger'
-    remove.textContent = ui('删除')
+    remove.textContent = ui('Delete')
     remove.addEventListener('click', () => deleteModel(model))
     actions.append(test, edit, remove)
     card.append(body, actions)
@@ -101,13 +102,14 @@ export function createExternalModelsView(deps: ExternalModelsViewDependencies): 
       apiKey: deps.externalModelApiKeyEl.value.trim(),
       modelName: deps.externalModelModelNameEl.value.trim(),
     }
+    if (!await requestModelAccess(payload.baseUrl)) throw new Error(language() === 'en' ? 'Themis needs access to this model address to call it. Allow it when Chrome asks.' : 'Themis cần quyền truy cập địa chỉ model này để gọi nó. Hãy cho phép khi Chrome hỏi.')
     await deps.runCommand(modelId ? 'EXTERNAL_MODEL_UPDATE' : 'EXTERNAL_MODEL_CREATE', modelId ? { modelId, ...payload } : payload)
     resetForm()
     renderExternalModels()
   }
 
   function deleteModel(model: ExternalModelConfig): void {
-    const message = language() === 'en' ? `Delete external model "${model.name}"?` : `确定删除外部模型「${model.name}」吗？`
+    const message = language() === 'en' ? `Delete external model "${model.name}"?` : `Delete external model “${model.name}”?`
     if (!window.confirm(message)) return
     deps.runCommand('EXTERNAL_MODEL_DELETE', { modelId: model.id })
       .then(() => {
@@ -118,12 +120,13 @@ export function createExternalModelsView(deps: ExternalModelsViewDependencies): 
   }
 
   async function testModel(model: ExternalModelConfig, button: HTMLButtonElement): Promise<void> {
-    const originalText = button.textContent ?? ui('测试')
+    const originalText = button.textContent ?? ui('Test')
     button.disabled = true
-    button.textContent = ui('测试中')
+    button.textContent = ui('Testing')
     try {
+      if (!await requestModelAccess(model.baseUrl)) throw new Error(language() === 'en' ? 'Themis needs access to this model address to call it. Allow it when Chrome asks.' : 'Themis cần quyền truy cập địa chỉ model này để gọi nó. Hãy cho phép khi Chrome hỏi.')
       await deps.testExternalModel(model.id)
-      button.textContent = ui('测试通过')
+      button.textContent = ui('Test passed')
     } catch (error: any) {
       button.textContent = originalText
       const message = error?.friendlyMessage ?? (error instanceof Error ? error.message : String(error))

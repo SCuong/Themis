@@ -18,6 +18,7 @@ import type { PromptSender } from './promptDelivery'
 import type { RuntimeMessage } from './runtimeClient'
 import type { RuntimeFrameRegistry } from './runtimeFrames'
 import { getChatRoles, mutateStore, requireChat, requireRole } from './storeAccess'
+import { promptSignature } from './promptSync'
 
 export const ROLE_ROUTE_TYPES = [
   'ROLE_TEMPLATE_PERSONA_GENERATE',
@@ -47,14 +48,14 @@ export interface RoleHandlersDependencies {
 
 export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMessageRoute[] {
   const handleRoleTemplatePersonaGenerate = async (message: RuntimeMessage) => {
-    const description = requireString(message.description, '请先描述想要生成的人设')
+    const description = requireString(message.description, 'Describe the persona you want to generate first')
     const { result } = await mutateStore(store => {
       const modelId = readOptionalString(message.modelId) ?? store.settings.externalModelOrder[0]
       const model = modelId ? store.settings.externalModelsById[modelId] : undefined
-      if (!model) throw new Error('请先配置外部模型后再使用 AI 生成人设')
+      if (!model) throw new Error('Please configure an external model before using AI persona generation')
       return { model, language: store.settings.language }
     })
-    if (!deps.externalModelClient) throw new Error('AI 生成人设客户端不可用')
+    if (!deps.externalModelClient) throw new Error('AI persona generation client is unavailable')
 
     const prompt = buildRoleTemplatePersonaPrompt({ description, language: result.language })
     const completion = await deps.externalModelClient.complete({ model: result.model, prompt })
@@ -69,7 +70,7 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
 
   const handleRoleTemplateCreate = async (message: RuntimeMessage) => {
     const { store, result } = await mutateStore(store => createRoleTemplate(store, {
-      name: requireString(message.name, '人员名称不能为空'),
+      name: requireString(message.name, 'Member name cannot be empty'),
       description: readOptionalString(message.description),
       systemPrompt: readOptionalString(message.systemPrompt),
       defaultModelSource: readModelSource(message.defaultModelSource),
@@ -85,8 +86,8 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
 
   const handleRoleTemplateUpdate = async (message: RuntimeMessage) => {
     const patch = isRecord(message.patch) ? message.patch : message
-    const { store, result } = await mutateStore(store => updateRoleTemplate(store, requireString(message.templateId, '缺少模板 ID'), {
-      name: requireString(patch.name, '人员名称不能为空'),
+    const { store, result } = await mutateStore(store => updateRoleTemplate(store, requireString(message.templateId, 'Missing template ID'), {
+      name: requireString(patch.name, 'Member name cannot be empty'),
       description: readOptionalString(patch.description),
       systemPrompt: readOptionalString(patch.systemPrompt),
       defaultModelSource: readModelSource(patch.defaultModelSource),
@@ -101,7 +102,7 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
   }
 
   const handleRoleTemplateDelete = async (message: RuntimeMessage) => {
-    const templateId = requireString(message.templateId, '缺少模板 ID')
+    const templateId = requireString(message.templateId, 'Missing template ID')
     const { store } = await mutateStore(store => {
       const usage = getRoleTemplateUsage(store, templateId)
       if (usage.usedByChatIds.length > 0) {
@@ -116,7 +117,7 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
 
   const handleRoleCreate = async (message: RuntimeMessage) => {
     const timestamp = deps.now()
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
     const templateId = readOptionalString(message.roleTemplateId) ?? readOptionalString(message.templateId)
     const { store, result } = await mutateStore(store => createGroupRole(store, {
       chatId,
@@ -138,7 +139,7 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
   }
 
   const handleRolesCreateBatch = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
     const rawItems = Array.isArray(message.items) ? message.items : []
     deps.log.info('role-create-batch:start', { chatId, itemCount: rawItems.length, source: getRawBatchSource(rawItems) })
 
@@ -163,7 +164,7 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
 
   const handleRoleUpdate = async (message: RuntimeMessage) => {
     const patch = isRecord(message.patch) ? message.patch : message
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
     const { store, result } = await mutateStore(store => {
       const role = store.rolesById[roleId]
       const previousChatSite = role?.chatSite
@@ -187,10 +188,10 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
   }
 
   const handleRoleDelete = async (message: RuntimeMessage) => {
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
     const result = await mutateStore(store => {
       const role = store.rolesById[roleId]
-      if (!role) throw new Error(`找不到人员：${roleId}`)
+      if (!role) throw new Error(`Member not found: ${roleId}`)
       const chatId = role.chatId
       deleteGroupRole(store, roleId, deps.now())
       deps.runtimeFrames.removeRole(chatId, roleId)
@@ -225,22 +226,23 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
   }
 
   const handleRoleReinitialize = async (message: RuntimeMessage) => {
-    const chatId = requireString(message.chatId, '缺少群聊 ID')
-    const roleId = requireString(message.roleId, '缺少人员 ID')
+    const chatId = requireString(message.chatId, 'Missing group chat ID')
+    const roleId = requireString(message.roleId, 'Missing member ID')
     const binding = deps.runtimeFrames.getByRole(chatId, roleId)
     deps.log.info('role-reinitialize:start', { chatId, roleId, binding })
-    if (!binding?.ready) throw new Error('人员 iframe 尚未就绪，请先恢复人员')
+    if (!binding?.ready) throw new Error('The member iframe is not ready. Please restore the member first')
 
     const timestamp = deps.now()
     const { store, result } = await mutateStore(store => {
       const chat = requireChat(store, chatId)
       const role = requireRole(store, chat.id, roleId)
       const roles = getChatRoles(store, chat)
-      if (role.status !== 'ready') throw new Error(`人员不可用：${role.name}`)
+      if (role.status !== 'ready') throw new Error(`Member unavailable: ${role.name}`)
 
       const messageId = deps.newId('init')
       const replyAttemptId = deps.newId('attempt')
       const includesPersona = !roleUsesChatGptGptsPersona(role)
+      if (includesPersona) role.promptSyncPending = { messageId, signature: promptSignature(store, chat, role, roles) }
       role.status = 'thinking'
       role.lastPromptMessageId = messageId
       role.replyAttemptId = replyAttemptId
@@ -294,13 +296,13 @@ export function createRoleHandlers(deps: RoleHandlersDependencies): BackgroundMe
 }
 
 function readGroupRoleBatchItem(value: unknown): Parameters<typeof createGroupRolesBatch>[2][number] {
-  if (!isRecord(value)) throw new Error('添加人员项无效')
+  if (!isRecord(value)) throw new Error('Invalid member entry to add')
   const chatSite = readChatSite(value.chatSite)
 
   if (value.source === 'library') {
     return {
       source: 'library',
-      roleTemplateId: requireString(value.roleTemplateId ?? value.templateId, '缺少人员库 ID'),
+      roleTemplateId: requireString(value.roleTemplateId ?? value.templateId, 'Missing member library ID'),
       modelSource: readModelSource(value.modelSource),
       chatSite,
       externalModelId: readOptionalString(value.externalModelId),
@@ -311,7 +313,7 @@ function readGroupRoleBatchItem(value: unknown): Parameters<typeof createGroupRo
   if (value.source === 'temporary') {
     return {
       source: 'temporary',
-      name: requireString(value.name, '人员名称不能为空'),
+      name: requireString(value.name, 'Member name cannot be empty'),
       createdBy: readRoleCreatedBy(value.createdBy),
       description: readOptionalString(value.description),
       systemPrompt: readOptionalString(value.systemPrompt) ?? '',
@@ -322,7 +324,7 @@ function readGroupRoleBatchItem(value: unknown): Parameters<typeof createGroupRo
     }
   }
 
-  throw new Error('添加人员来源无效')
+  throw new Error('Invalid source for adding a member')
 }
 
 function readRoleCreatedBy(value: unknown): Parameters<typeof createGroupRole>[1]['createdBy'] {

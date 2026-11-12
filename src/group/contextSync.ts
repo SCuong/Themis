@@ -15,12 +15,17 @@ export function getUnsyncedMessagesForRole(
   userMessage: GroupMessage,
 ): GroupMessage[] {
   const messageById = new Map(messages.map(message => [message.id, message]))
+  // A member starting a new site conversation also gets back its own earlier replies (independent mode
+  // gets only its own thread), so the new conversation picks up where the old one left off.
+  const fresh = role.contextCursor === 0
 
   return chat.messageIds
     .map(messageId => messageById.get(messageId))
     .filter((message): message is GroupMessage => Boolean(message))
-    .filter(message => message.seq > role.contextCursor && message.id !== userMessage.id && message.roleId !== role.id)
-    .filter(message => isMessageVisibleToRole(message, role.id))
+    .filter(message => message.seq > role.contextCursor && message.id !== userMessage.id && (message.roleId !== role.id || (fresh && message.status !== 'error')))
+    .filter(message => chat.mode === 'collaborative'
+      ? isMessageVisibleToRole(message, role.id)
+      : fresh && (message.roleId === role.id || (message.type === 'user' && Boolean(message.targetRoleIds?.includes(role.id)))))
     .filter(message => Boolean(message.content.trim()))
 }
 
@@ -59,11 +64,11 @@ export function getContextCursorAfterAck(chat: GroupChat, messages?: GroupMessag
 export function formatContextMessage(message: GroupMessage, languageInput?: OpenTeamLanguage): string {
   const language = normalizeLanguage(languageInput)
   const speaker = message.type === 'assistant'
-    ? message.roleName ?? (language === 'en' ? 'Person' : '人员')
+    ? message.roleName ?? (language === 'en' ? 'Person' : 'Person')
     : message.type === 'user'
-      ? (language === 'en' ? 'User' : '用户')
-      : (language === 'en' ? 'System' : '系统')
-  return `${speaker}${language === 'en' ? ': ' : '：'}${message.content}`
+      ? (language === 'en' ? 'User' : 'User')
+      : (language === 'en' ? 'System' : 'System')
+  return `${speaker}${language === 'en' ? ': ' : ': '}${message.content}`
 }
 
 function isMessageVisibleToRole(message: GroupMessage, roleId: string): boolean {
