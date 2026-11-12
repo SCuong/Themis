@@ -63,7 +63,7 @@ function readAsDataUrl(file) {
   });
 }
 
-// shortcut: stored files are never pruned when a chat is deleted; add cleanup if storage use becomes a problem.
+// background.js (otDeleteComposerFiles) removes a chat's files from this store when the chat is deleted.
 const fileStore = (() => {
   let opening;
   const open = () =>

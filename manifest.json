@@ -27,6 +27,12 @@
     "https://chat.deepseek.com/*",
     "https://grok.com/*",
     "https://*.grok.com/*",
+    "https://openai.com/*",
+    "https://*.openai.com/*",
+    "https://oaiusercontent.com/*",
+    "https://*.oaiusercontent.com/*"
+  ],
+  "optional_host_permissions": [
     "https://*/*",
     "http://*/*"
   ],

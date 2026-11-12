@@ -107,11 +107,24 @@ npm run check   # syntax check of the extension's scripts
 npm test        # unit, background-harness and browser UI tests
 ```
 
+GitHub Actions runs `npm run check` and `npm test` on every push and pull request (`.github/workflows/test.yml`).
+
+**Live check against the real AI sites.** The tests above use simulated pages, so they cannot notice when a site changes its markup. `providers.live.cjs` runs the extension's own site adapters on the real sites: it sends one short prompt to each and waits for the reply.
+
+```bash
+npm run test:live:login   # once: sign in to each site in the Chrome window that opens, then close it
+npm run test:live         # THEMIS_LIVE_SITES=chatgpt,claude limits the sites
+```
+
+It uses a separate Chrome profile in `test-results/live-profile`, uses a little of each account's quota, and is not run in CI.
+
+**Rebuilding the upstream base.** `npm run rebuild:upstream` builds OpenTeam v1.0.3 (commit `8ef6f37`) from its TypeScript source and lists which shipped files are identical to that build and which Themis changed. Today `assets/index-Cvqzct0I.js` and `assets/tiptapNoteEditor-DPZh58fM.js` are byte-identical; `background.js`, `content.js`, `team.js`, `team.html`, `team.css`, `manifest.json` and `assets/imageAttachmentRepository-DBrzc-g8.js` carry Themis's changes, which were made to the built files directly. The files Themis added (`composer-files.js`, `team-ui.js`, `localization.js`, `profile-avatars.js`, `team-refinements.css`) are plain, unminified source.
+
 - The browser UI tests drive Google Chrome through `playwright-core` and expect Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` (see `ui-fixture.cjs`). Change that path on macOS or Linux.
 - `prompt-sync-harness.cjs` loads the real `background.js` against a fake `chrome` API, so message routing can be tested without a browser.
 - `node preview-server.cjs 5173` serves the workspace page at `http://localhost:5173/team.html` for UI work, with sample data and no real AI sites.
 
-**Current results** (at the commit in this repository): `npm run check` passes, and `npm test` runs 60 tests. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
+**Current results** (at the commit in this repository): `npm run check` passes, and `npm test` runs 63 tests. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
 
 ## Limitations
 
@@ -121,14 +134,14 @@ npm test        # unit, background-harness and browser UI tests
 - **Personas are prompts, not people.** The thinking-style advisors are written to reflect public ideas. They are not affiliated with or endorsed by the people or organizations they are named after, and they can be wrong.
 - **Model output is not verified.** Reviews and critiques come from the models themselves. Treat them as input to your judgment, not as proof.
 - **Chrome only.** Themis has only been used with desktop Google Chrome.
-- **Bundled code.** Most of the code is minified build output, which makes auditing and modification harder than with the original source.
+- **Bundled code.** Most of the code is minified build output, which makes auditing and modification harder than with the original source. Themis's changes to those files are not yet ported back to TypeScript source, so Themis itself cannot be rebuilt from source; `npm run rebuild:upstream` shows exactly which files differ from the reproducible upstream build.
 
 ## Security and privacy
 
 - **No Themis server.** Prompts go from your browser to the AI sites you use, and to any API provider you configure. Themis does not send data anywhere else.
-- **Frame protection is relaxed for the AI sites.** To embed the AI sites, `themis-frame-rules.json` removes the `Content-Security-Policy` and `X-Frame-Options` response headers for those six sites, only when they load inside a frame. This weakens those sites' protection against being framed while the extension is installed.
-- **Broad host permissions.** The extension requests `https://*/*` and `http://*/*` so that API models can use any base URL you enter. It also has clipboard permissions, used as a fallback for reading a reply from an AI site when the reply cannot be read from the page directly.
-- **Local storage is not encrypted.** Chats, personas, settings and **API keys for external models** are stored in `chrome.storage.local`; attachments are stored in IndexedDB. Anyone with access to your Chrome profile can read them. Attachments are not removed automatically when a chat is deleted.
+- **Frame protection is relaxed for the AI sites.** To embed the AI sites, `themis-frame-rules.json` removes the `Content-Security-Policy` and `X-Frame-Options` response headers for those six sites, only when they load inside a frame opened by Themis itself (or navigate within such a frame). Other websites that try to frame the AI sites still get the sites' normal protection.
+- **Host permissions.** Access to any site other than the AI sites (and OpenAI's image hosts, for saving ChatGPT reply images) is optional: when you save or test an API model, Chrome asks for access to that model's host only. It also has clipboard permissions, used as a fallback for reading a reply from an AI site when the reply cannot be read from the page directly.
+- **Local storage.** Chats, personas and settings are stored in `chrome.storage.local`; attachments are stored in IndexedDB. **API keys for external models** are encrypted (AES-GCM) before they are stored, with a non-extractable key kept in the extension's IndexedDB, so a copy of `chrome.storage` does not reveal them. This is not a password vault: anyone who controls your Chrome profile can still run the extension and use the keys. Deleting a chat removes its messages, attachments, notes, highlights, model memories and workflows.
 - **Your accounts, your data.** Messages and attachments you send to a member are sent to that member's AI provider and are subject to that provider's policies.
 
 ## License and credits
