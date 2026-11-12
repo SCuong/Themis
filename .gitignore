@@ -1,0 +1,24 @@
+# Dependencies and generated output
+node_modules/
+test-results/
+
+# Chrome-generated extension cache
+_metadata/
+
+# Local tool configuration and caches
+.claude/
+.impeccable/
+PRODUCT.md
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key

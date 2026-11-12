@@ -1,0 +1,9 @@
+Create ONE production raster sprite atlas for the Themis AI teamwork app: precisely 4 columns and 3 rows, TWELVE square cells, equal sized, touching edge to edge, no gaps, no margins, no labels, no text, no borders. Overall image 4:3 aspect ratio. Each cell contains one different fictional professional portrait, head and upper shoulders centered, comfortably fitting an inscribed circle with 12% breathing room. Elegant contemporary editorial illustration, matte painted shapes, refined subtly dimensional lighting, understated natural expressions, sophisticated diverse adults, clean recognizable silhouettes at 40px. Consistent illustration style and face scale throughout. Soft solid muted pale backgrounds.
+
+Top row left to right: product strategist woman with dark bob and teal jacket on pale mint; software engineer man with round glasses and navy overshirt on pale blue gray; growth advisor woman with short curly hair and terracotta top on pale peach; researcher man with wavy dark hair and ochre cardigan on pale sand.
+
+Middle row left to right: designer woman with silver pixie hair and coral shirt on pale rose; operations coordinator man with dark skin and green shirt on pale sage; teacher woman with glasses and mustard jacket on pale cream; health advisor man with warm brown skin in pale blue shirt on pale aqua.
+
+Bottom row left to right: finance advisor woman with shoulder length dark hair in charcoal jacket on pale stone; legal advisor older man with gray beard and olive jacket on pale beige; creative writer nonbinary adult with auburn hair and plum shirt on pale lavender gray; general consultant woman with braided hair in teal blouse on pale turquoise.
+
+No tools, no badges, no medical symbols, no corporate logos. No gradients outside the illustrations. This is an avatar atlas asset, NOT a UI mockup.

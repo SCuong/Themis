@@ -1,0 +1,55 @@
+const assert = require('node:assert/strict');
+const { mkdir } = require('node:fs/promises');
+const path = require('node:path');
+const { test } = require('node:test');
+const { openFixture } = require('./ui-fixture.cjs');
+
+test('chat, mobile navigation and member persona editor work in an isolated browser fixture', { timeout: 60000 }, async () => {
+  const { browser, page, errors } = await openFixture();
+  const root = __dirname;
+  try {
+    await page.locator('#settings-button').click();
+    await page.locator('#theme-light').click();
+    await page.locator('#settings-button').click();
+    await page.locator('.message-row.assistant').first().waitFor();
+    await mkdir(path.join(root, 'test-results'), { recursive: true });
+    await page.screenshot({ path: path.join(root, 'test-results/ui-desktop-light.png') });
+    const avatar = page.locator('.message-avatar[role=button]').first();
+    await avatar.focus();
+    await page.keyboard.press('Enter');
+    assert.ok((await page.locator('#message-input').inputValue()).includes('@ProductManager'));
+    await page.locator('#message-input').fill('');
+    await page.locator('.manual-mention-toggle').click();
+    assert.equal(await page.locator('.manual-mention-toggle').getAttribute('aria-checked'), 'true');
+    await page.locator('.manual-mention-toggle').click();
+    assert.equal(await page.locator('.manual-mention-toggle').getAttribute('aria-checked'), 'false');
+    await page.locator('#toggle-people-drawer').click();
+    await page.locator('.role-prompt-detail').first().click();
+    await page.locator('.member-persona-editor textarea').fill('Trả lời bằng tiếng Việt. Ưu tiên giải pháp đơn giản.');
+    await page.locator('.member-persona-editor button[type=submit]').click();
+    await page.locator('.role-prompt-modal').waitFor({ state: 'detached' });
+    const commands = await page.evaluate(() => window.__fixtureCommands);
+    assert.ok(commands.some(command => command.type === 'ROLE_TEMPLATE_UPDATE' && command.patch.systemPrompt.includes('Ưu tiên')));
+    await page.locator('#close-people-drawer').click();
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.locator('#toggle-chat-sidebar').click();
+    assert.equal(await page.locator('#toggle-chat-sidebar').getAttribute('aria-expanded'), 'true');
+    await page.locator('.sidebar').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.sidebar').isVisible(), true);
+    const sidebar = await page.locator('.sidebar').boundingBox();
+    assert.ok(sidebar.x >= 0 && sidebar.x + sidebar.width <= 375);
+    await page.screenshot({ path: path.join(root, 'test-results/ui-mobile-chats.png') });
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#toggle-chat-sidebar').getAttribute('aria-expanded'), 'false');
+    await page.locator('#toggle-chat-sidebar').click();
+    await page.locator('#settings-button').click();
+    await page.locator('#theme-dark').click();
+    await page.locator('#settings-button').click();
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: path.join(root, 'test-results/ui-mobile-dark.png') });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile viewport must not overflow horizontally');
+    const composer = await page.locator('#composer').boundingBox();
+    assert.ok(composer.x >= 0 && composer.x + composer.width <= 375, 'composer must fit the narrow viewport');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});

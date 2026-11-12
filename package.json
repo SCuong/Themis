@@ -1,0 +1,17 @@
+{
+  "name": "themis-extension",
+  "version": "1.0.3",
+  "private": true,
+  "description": "Chrome extension workspace for multi-AI group chat, critique and orchestration (modified from OpenTeam).",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "scripts": {
+    "test": "node --test *.test.cjs",
+    "check": "node --check background.js && node --check content.js && node --check team.js && node --check assets/imageAttachmentRepository-DBrzc-g8.js && node --check team-ui.js && node --check profile-avatars.js && node --check localization.js"
+  },
+  "devDependencies": {
+    "acorn": "^8.15.0",
+    "jsdom": "^26.1.0",
+    "playwright-core": "^1.56.1"
+  },
+  "type": "module"
+}

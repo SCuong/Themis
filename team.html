@@ -1,0 +1,582 @@
+<!DOCTYPE html><html lang="vi" data-theme="dark"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Themis</title>
+    <link rel="stylesheet" href="team.css">
+    <link rel="stylesheet" href="team-refinements.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+
+      <button id="window-resize-handle" class="window-resize-handle" type="button" aria-label="Resize window" title="Resize window"></button>
+      <aside id="chat-sidebar" class="panel sidebar">
+        <div class="panel-header">
+          <div class="brand-mark">
+            <span class="sidebar-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2"></rect><rect x="13" y="3" width="8" height="8" rx="2" opacity=".65"></rect><rect x="3" y="13" width="8" height="8" rx="2" opacity=".65"></rect><rect x="13" y="13" width="8" height="8" rx="2"></rect></svg></span>
+            <div class="sidebar-brand-copy">
+              <div class="sidebar-brand-line">
+                <h1>Themis</h1>
+              </div>
+              <p id="store-summary" class="tiny">Loading chats</p>
+            </div>
+          </div>
+          <div class="sidebar-header-actions">
+            <button id="collapse-sidebar" class="icon-btn" type="button" aria-label="Collapse sidebar" aria-controls="chat-sidebar" aria-expanded="true"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM40,56H80V200H40ZM216,200H96V56H216V200Z"></path></svg></button>
+            <button id="close-chat-sidebar" class="icon-btn" type="button" aria-label="Close chats"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path></svg></button>
+          </div>
+        </div>
+        <nav class="rail" aria-label="Themis navigation">
+          <div class="rail-actions">
+          <button id="quick-create-chat" class="rail-btn sidebar-new-chat" type="button" aria-label="New chat" aria-controls="create-chat-form" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg><span class="rail-label" aria-hidden="true">New chat</span></button>
+          <button id="open-chats" aria-controls="chat-sidebar" class="rail-btn active" type="button" aria-label="Chats" data-tooltip="Chats">
+            <svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path class="ph-r" d="M128,24A104,104,0,0,0,36.18,176.88L24.83,210.93a16,16,0,0,0,20.24,20.24l34.05-11.35A104,104,0,1,0,128,24Zm0,192a87.87,87.87,0,0,1-44.06-11.81,8,8,0,0,0-6.54-.67L40,216,52.47,178.6a8,8,0,0,0-.66-6.54A88,88,0,1,1,128,216Z"></path><path class="ph-f" d="M232,128A104,104,0,0,1,79.12,219.82L45.07,231.17a16,16,0,0,1-20.24-20.24l11.35-34.05A104,104,0,1,1,232,128Z"></path></svg>
+          <span class="rail-label" aria-hidden="true">Chats</span></button>
+          <button id="open-all-notes" class="rail-btn" type="button" aria-label="View all notes" data-tooltip="All notes"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M168,128a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,128Zm-8,24H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16ZM216,40V200a32,32,0,0,1-32,32H72a32,32,0,0,1-32-32V40a8,8,0,0,1,8-8H72V24a8,8,0,0,1,16,0v8h32V24a8,8,0,0,1,16,0v8h32V24a8,8,0,0,1,16,0v8h24A8,8,0,0,1,216,40Zm-16,8H184v8a8,8,0,0,1-16,0V48H136v8a8,8,0,0,1-16,0V48H88v8a8,8,0,0,1-16,0V48H56V200a16,16,0,0,0,16,16H184a16,16,0,0,0,16-16Z"></path></svg><span class="rail-label" aria-hidden="true">Notes</span></button>
+          <button id="open-people-library" class="rail-btn" type="button" aria-label="Open people library" data-tooltip="People library">
+            <svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>
+          <span class="rail-label" aria-hidden="true">People</span></button>
+          <button id="open-external-models" class="rail-btn" type="button" aria-label="Add model" data-tooltip="Add model">
+            <svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M223.68,66.15,135.68,18h0a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32h0l80.34,44L128,120,47.66,76ZM40,90l80,43.78v85.79L40,175.82Zm96,129.57V133.82L216,90v85.78Z"></path></svg>
+          <span class="rail-label" aria-hidden="true">Models</span></button>
+          </div>
+        </nav>
+
+                <form id="create-chat-form" class="chat-create" hidden="">
+          <div id="chat-create-popover">
+            <h2>New chat</h2>
+          </div>
+          <div class="field">
+            <label for="new-chat-name">Chat name</label>
+            <input id="new-chat-name" type="text" placeholder="Example: product proposal review" autocomplete="off">
+          </div>
+          <fieldset class="field">
+            <legend>Chat mode</legend>
+            <div class="mode-options">
+              <label class="mode-option" for="new-chat-mode-collaborative">
+                <input id="new-chat-mode-collaborative" type="radio" name="new-chat-mode" value="collaborative" checked="">
+                <span>
+                  <span class="mode-name">Collaborative chat</span>
+                  <span class="mode-help">Members share chat context; good for sequential discussion.</span>
+                </span>
+              </label>
+              <label class="mode-option" for="new-chat-mode-independent">
+                <input id="new-chat-mode-independent" type="radio" name="new-chat-mode" value="independent">
+                <span>
+                  <span class="mode-name">Independent experts</span>
+                  <span class="mode-help">Members answer independently; good for parallel review.</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <div class="two-col">
+            <button id="cancel-create-chat" class="btn" type="button">Cancel</button>
+            <button class="btn btn-primary" type="submit">Create</button>
+          </div>
+          <div class="chat-create-template-row">
+            <button id="open-group-template-create" class="btn btn-ghost chat-create-template-btn" type="button">Create from template</button>
+          </div>
+        </form>
+
+        <h2 id="chat-list-label" class="sidebar-section-label">Chats</h2>
+        <div id="chat-list" class="chat-list" role="group" aria-labelledby="chat-list-label"></div>
+        <div class="rail-bottom">
+          <button id="settings-button" class="rail-btn" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings-menu"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path class="ph-r" d="M40,88H73a32,32,0,0,0,62,0h81a8,8,0,0,0,0-16H135a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16Zm64-24A16,16,0,1,1,88,80,16,16,0,0,1,104,64ZM216,168H199a32,32,0,0,0-62,0H40a8,8,0,0,0,0,16h97a32,32,0,0,0,62,0h17a8,8,0,0,0,0-16Zm-48,24a16,16,0,1,1,16-16A16,16,0,0,1,168,192Z"></path><path class="ph-f" d="M32,80a8,8,0,0,1,8-8H77.17a28,28,0,0,1,53.66,0H216a8,8,0,0,1,0,16H130.83a28,28,0,0,1-53.66,0H40A8,8,0,0,1,32,80Zm184,88H194.83a28,28,0,0,0-53.66,0H40a8,8,0,0,0,0,16H141.17a28,28,0,0,0,53.66,0H216a8,8,0,0,0,0-16Z"></path></svg><span class="rail-label" aria-hidden="true">Settings</span></button>
+          <div id="settings-menu" class="settings-menu" hidden="">
+            <h2 id="settings-title">Settings</h2>
+            <p class="settings-label" id="theme-label">Appearance</p>
+            <div id="theme-switch" class="theme-switch" role="group" aria-labelledby="theme-label">
+              <button id="theme-light" class="theme-option" type="button" aria-pressed="false" title="Light mode">
+                <span aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path class="ph-r" d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"></path><path class="ph-f" d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm8,24a64,64,0,1,0,64,64A64.07,64.07,0,0,0,128,64ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"></path></svg></span>
+                <span>Light</span>
+              </button>
+              <button id="theme-dark" class="theme-option" type="button" aria-pressed="true" title="Dark mode">
+                <span aria-hidden="true"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path class="ph-r" d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"></path><path class="ph-f" d="M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.88,57.48a104.84,104.84,0,0,1,52.91-37,8,8,0,0,1,10,10,88.08,88.08,0,0,0,109.8,109.8,8,8,0,0,1,10,10Z"></path></svg></span>
+                <span>Dark</span>
+              </button>
+            </div>
+            <div class="settings-section">
+              <div class="settings-label">Language</div>
+              <div class="settings-segment" role="group" aria-label="Language">
+                <button id="language-en" class="settings-segment-option" type="button" aria-pressed="true">English</button>
+                <button id="language-vi" class="settings-segment-option" type="button" aria-pressed="false">Tiếng Việt</button>
+              </div>
+            </div>
+            <div class="settings-section window-settings">
+              <p class="settings-label" id="window-controls-label">Window</p>
+              <div id="floating-toolbar" class="floating-toolbar" role="group" aria-labelledby="window-controls-label">
+
+                <button id="toggle-window-size" class="icon-btn window-dot window-dot-minimize" type="button" aria-expanded="true" aria-label="Minimize window" title="Minimize window"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128Z"></path></svg></button>
+                <button id="toggle-fullscreen" class="icon-btn window-dot window-dot-fullscreen" type="button" aria-pressed="false" aria-label="Fullscreen window" title="Fullscreen window"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M216,48V88a8,8,0,0,1-16,0V56H168a8,8,0,0,1,0-16h40A8,8,0,0,1,216,48ZM88,200H56V168a8,8,0,0,0-16,0v40a8,8,0,0,0,8,8H88a8,8,0,0,0,0-16Zm120-40a8,8,0,0,0-8,8v32H168a8,8,0,0,0,0,16h40a8,8,0,0,0,8-8V168A8,8,0,0,0,208,160ZM88,40H48a8,8,0,0,0-8,8V88a8,8,0,0,0,16,0V56H88a8,8,0,0,0,0-16Z"></path></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="panel workspace">
+        <header class="chat-header">
+          <button id="toggle-chat-sidebar" class="icon-btn" type="button" aria-label="Chats" aria-controls="chat-sidebar" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"></path></svg>
+          </button>
+          <div class="chat-title-block">
+            <div class="chat-title-line"><h2 id="chat-title" class="chat-title">No chat selected</h2><span id="chat-status" class="status-pill">Empty</span></div>
+            <p id="chat-subtitle" class="chat-subtitle">Create or select a chat to start collaborating</p>
+          </div>
+          <div class="chat-row">
+
+            <button id="open-orchestration" class="btn drawer-summary" type="button">
+              <svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M160,112h48a16,16,0,0,0,16-16V48a16,16,0,0,0-16-16H160a16,16,0,0,0-16,16V64H128a24,24,0,0,0-24,24v32H72v-8A16,16,0,0,0,56,96H24A16,16,0,0,0,8,112v32a16,16,0,0,0,16,16H56a16,16,0,0,0,16-16v-8h32v32a24,24,0,0,0,24,24h16v16a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V160a16,16,0,0,0-16-16H160a16,16,0,0,0-16,16v16H128a8,8,0,0,1-8-8V88a8,8,0,0,1,8-8h16V96A16,16,0,0,0,160,112ZM56,144H24V112H56v32Zm104,16h48v48H160Zm0-112h48V96H160Z"></path></svg>
+              <span>Orchestration</span>
+            </button>
+            <button id="toggle-people-drawer" aria-controls="role-panel" class="btn drawer-summary" type="button" aria-expanded="false">Members 0</button>
+            <button id="toggle-notes-panel" class="btn drawer-summary" type="button" aria-expanded="false" aria-controls="notes-panel">Notes</button>
+            <button id="restore-chat" class="btn" type="button">Restore session</button>
+          </div>
+        </header>
+
+        <section id="messages" class="messages" role="log" aria-labelledby="chat-title" tabindex="0"></section>
+
+        <form id="composer" class="composer">
+          <div id="reference-draft" class="reference-draft" hidden=""></div>
+          <ul id="composer-files" class="composer-files" aria-label="Files to send" hidden=""></ul>
+          <div id="mention-panel" class="mention-panel" hidden=""></div>
+          <div class="composer-input"><div id="message-input-mirror" class="message-input-mirror" aria-hidden="true"></div>
+          <textarea id="message-input" aria-label="Message" aria-describedby="target-preview" placeholder="Message the team"></textarea></div>
+          <div class="composer-feedback">
+            <div id="target-preview" class="muted tiny">Select a chat to send</div>
+            <div id="busy-preview" class="tiny" role="status"></div>
+            <div id="composer-files-status" class="tiny composer-files-status" role="alert"></div>
+          </div>
+          <div class="composer-tools" id="composer-options">
+            <input id="composer-file-input" type="file" multiple="" hidden="">
+            <button id="attach-file" class="btn icon-btn" type="button" aria-label="Attach files" title="Attach files"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M209.66,122.34a8,8,0,0,1,0,11.32l-82.05,82a56,56,0,0,1-79.2-79.21L147.67,35.73a40,40,0,1,1,56.61,56.55L105,193A24,24,0,1,1,71,159L154.3,74.38A8,8,0,1,1,165.7,85.6L82.39,170.31a8,8,0,1,0,11.27,11.36L192.93,81A24,24,0,1,0,159,47L59.76,147.68a40,40,0,1,0,56.53,56.62l82.06-82A8,8,0,0,1,209.66,122.34Z"></path></svg></button>
+          </div>
+          <div class="composer-actions">
+            <button id="send-message" class="btn btn-primary icon-btn" aria-label="Send message" type="submit" disabled=""><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,117.66a8,8,0,0,1-11.32,0L136,59.31V216a8,8,0,0,1-16,0V59.31L61.66,117.66a8,8,0,0,1-11.32-11.32l72-72a8,8,0,0,1,11.32,0l72,72A8,8,0,0,1,205.66,117.66Z"></path></svg></button>
+          </div>
+        </form>
+      </main>
+
+      <aside id="role-panel" class="panel role-panel" aria-labelledby="role-panel-title">
+        <div class="panel-header">
+          <div>
+            <h2 id="role-panel-title">Chat members and people</h2>
+            <p id="role-summary" class="tiny">0 people</p>
+          </div>
+          <button id="open-gemini-login" class="icon-btn" type="button" aria-label="AI site login"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M141.66,133.66l-40,40a8,8,0,0,1-11.32-11.32L116.69,136H24a8,8,0,0,1,0-16h92.69L90.34,93.66a8,8,0,0,1,11.32-11.32l40,40A8,8,0,0,1,141.66,133.66ZM200,32H136a8,8,0,0,0,0,16h56V208H136a8,8,0,0,0,0,16h64a8,8,0,0,0,8-8V40A8,8,0,0,0,200,32Z"></path></svg></button>
+          <button id="close-people-drawer" class="icon-btn" type="button" aria-label="Close members"><svg aria-hidden="true" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path></svg></button>
+        </div>
+        <div class="role-scroll">
+          <div class="section-title">
+            <h3>Current chat people</h3>
+          </div>
+          <div id="role-list" class="role-list"></div>
+        </div>
+        <form id="add-role-form" class="editor-card role-form">
+          <select id="role-template-select" hidden=""></select>
+          <button class="btn btn-primary" type="submit">Add people</button>
+        </form>
+      </aside>
+
+    </div>
+    <aside id="notes-panel" class="panel notes-panel" aria-label="Notes panel">
+      <div id="notes-drag-handle" class="panel-header notes-panel-header" title="Drag notes">
+        <div>
+          <h2>Notes</h2>
+          <p class="tiny">Write notes manually or collect marked content.</p>
+        </div>
+        <button id="close-notes-panel" class="icon-btn" type="button" aria-label="Close notes">×</button>
+      </div>
+      <div class="note-scope-tabs" role="tablist" aria-label="Notes scope">
+        <button id="chat-note-tab" role="tab" aria-controls="notes-editor" class="note-scope-tab active" type="button" data-note-scope="chat">Current chat</button>
+        <button id="global-note-tab" role="tab" aria-controls="notes-editor" class="note-scope-tab" type="button" data-note-scope="global">Global notes</button>
+      </div>
+      <div class="note-toolbar" aria-label="Rich-text toolbar">
+        <button id="note-bold" class="note-tool-btn" type="button" aria-label="Bold">B</button>
+        <button id="note-italic" class="note-tool-btn" type="button" aria-label="Italic"><em>I</em></button>
+        <button id="note-strike" class="note-tool-btn" type="button" aria-label="Strikethrough"><s>S</s></button>
+        <button id="note-bullet-list" class="note-tool-btn" type="button" aria-label="Bullet list">•</button>
+        <button id="note-ordered-list" class="note-tool-btn" type="button" aria-label="Numbered list">1.</button>
+        <span class="note-toolbar-spacer"></span>
+        <button id="note-undo" class="note-tool-btn" type="button" aria-label="Undo">↶</button>
+        <button id="note-redo" class="note-tool-btn" type="button" aria-label="Redo">↷</button>
+      </div>
+      <div id="notes-editor" role="tabpanel" aria-labelledby="chat-note-tab" class="notes-editor" aria-label="Rich-text notes editor"></div>
+      <button id="notes-resize-handle" class="notes-resize-handle" type="button" aria-label="Resize notes" title="Resize notes"></button>
+    </aside>
+    <span id="template-summary" hidden=""></span>
+    <div id="template-list" hidden=""></div>
+    <button id="window-launcher" class="launcher" type="button" aria-label="Open Themis" hidden="">⌁</button>
+
+    <div id="all-notes-modal" class="modal-backdrop" hidden="">
+      <section class="modal all-notes-modal" role="dialog" aria-modal="true" aria-labelledby="all-notes-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="all-notes-title">All notes</h2>
+            <p class="tiny">Global, chat, and deleted-chat notes</p>
+          </div>
+          <button id="close-all-notes" class="icon-btn modal-close" type="button" aria-label="Close all notes">×</button>
+        </div>
+        <div class="all-notes-workspace">
+          <div id="all-notes-list" class="all-notes-list" aria-label="Notes scope"></div>
+          <section class="all-notes-editor-shell" aria-labelledby="all-notes-active-title">
+            <div class="all-notes-editor-header">
+              <div>
+                <h3 id="all-notes-active-title">Global notes</h3>
+                <p id="all-notes-active-meta" class="tiny">Manual note</p>
+              </div>
+            </div>
+            <div class="note-toolbar all-note-toolbar">
+              <button id="all-note-bold" class="note-tool-btn" type="button" aria-label="Bold"><b>B</b></button>
+              <button id="all-note-italic" class="note-tool-btn" type="button" aria-label="Italic"><i>I</i></button>
+              <button id="all-note-strike" class="note-tool-btn" type="button" aria-label="Strikethrough"><s>S</s></button>
+              <button id="all-note-bullet-list" class="note-tool-btn" type="button" aria-label="Bullet list">•</button>
+              <button id="all-note-ordered-list" class="note-tool-btn" type="button" aria-label="Numbered list">1.</button>
+              <span class="note-toolbar-spacer"></span>
+              <button id="all-note-undo" class="note-tool-btn" type="button" aria-label="Undo">↶</button>
+              <button id="all-note-redo" class="note-tool-btn" type="button" aria-label="Redo">↷</button>
+            </div>
+            <div id="all-notes-editor" class="notes-editor all-notes-editor" aria-label="Active note rich-text editor"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div id="group-template-modal" class="modal-backdrop" hidden="">
+      <section class="modal group-template-modal" role="dialog" aria-modal="true" aria-labelledby="group-template-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="group-template-title">Create from template</h2>
+            <p class="tiny">Choose a ready-made group; template people will be added automatically.</p>
+          </div>
+          <button id="close-group-template-modal" class="icon-btn modal-close" type="button" aria-label="Close chat templates">×</button>
+        </div>
+        <div class="group-template-toolbar">
+          <label class="group-template-search-field" for="group-template-search">
+            <span>Search templates</span>
+            <input id="group-template-search" type="search" autocomplete="off" placeholder="Search tasks, industries, roles, or template names, e.g. paper, contract, interview, AI Agent">
+          </label>
+          <div id="group-template-categories" class="group-template-categories" aria-label="Chat template categories"></div>
+        </div>
+        <div id="group-template-list" class="group-template-list" aria-label="Chat templates"></div>
+        <div class="group-template-footer">
+          <button id="confirm-group-template-create" class="btn btn-primary" type="button" disabled="">Confirm create</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="people-library-modal" class="modal-backdrop" hidden="">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="people-library-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="people-library-title">People library</h2>
+            <p class="tiny">Manage reusable personas; adding them to a chat creates independent copies.</p>
+          </div>
+          <div class="chat-row">
+            <button id="new-template" class="btn btn-primary" type="button">New</button>
+            <button id="close-people-library" class="icon-btn modal-close" type="button" aria-label="Close people library">×</button>
+          </div>
+        </div>
+        <div class="people-library-content">
+          <div class="people-library-pane">
+            <div class="section-title">
+              <h3>People list</h3>
+              <span id="people-library-summary" class="tiny">0 people</span>
+            </div>
+            <div class="people-library-toolbar">
+              <input id="people-library-search" aria-label="Search people" type="search" placeholder="Search people names, descriptions, or prompts" autocomplete="off">
+              <div class="template-type-tabs" role="tablist" aria-label="People library type">
+                <button id="people-library-tab-custom" role="tab" aria-controls="people-library-list" class="template-type-tab active" type="button" data-template-type="custom">Custom people</button>
+                <button id="people-library-tab-builtin" role="tab" aria-controls="people-library-list" class="template-type-tab" type="button" data-template-type="builtin">Built-in people</button>
+              </div>
+              <div id="people-library-category-filter" class="template-category-filter" aria-label="People categories"></div>
+            </div>
+            <div id="people-library-list" role="tabpanel" aria-labelledby="people-library-tab-custom" class="template-list"></div>
+            <div id="people-library-pagination" class="pagination-bar"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="external-models-modal" class="modal-backdrop" hidden="">
+      <section class="modal template-editor-modal" role="dialog" aria-modal="true" aria-labelledby="external-models-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="external-models-title">External models</h2>
+            <p class="tiny">Configure OpenAI or Anthropic-compatible APIs so people can use them directly.</p>
+          </div>
+          <button id="close-external-models" class="icon-btn modal-close" type="button" aria-label="Close external models">×</button>
+        </div>
+        <div id="external-models-list" class="template-list"></div>
+        <form id="external-model-form" class="modal-form">
+          <input id="external-model-id" type="hidden">
+          <div class="field">
+            <label for="external-model-name">Display name</label>
+            <input id="external-model-name" type="text" autocomplete="off" placeholder="Example: local model">
+          </div>
+          <div class="field">
+            <label for="external-model-format">API format</label>
+            <select id="external-model-format">
+              <option value="openai">OpenAI format</option>
+              <option value="anthropic">Anthropic format</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="external-model-base-url">Model URL</label>
+            <input id="external-model-base-url" type="url" autocomplete="off" placeholder="https://api.example.com/v1">
+          </div>
+          <div class="field">
+            <label for="external-model-api-key">Model key</label>
+            <input id="external-model-api-key" type="password" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="external-model-model-name">Model name</label>
+            <input id="external-model-model-name" type="text" autocomplete="off" placeholder="gpt-4.1 / claude-sonnet">
+          </div>
+          <div class="template-actions">
+            <button id="reset-external-model-form" class="btn" type="button">New</button>
+            <button class="btn btn-primary" type="submit">Save external model</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div id="person-template-modal" class="modal-backdrop" hidden="">
+      <section class="modal template-editor-modal" role="dialog" aria-modal="true" aria-labelledby="template-form-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="template-form-title">New person</h2>
+            <p class="tiny">Manage the person name, persona, and default site.</p>
+          </div>
+          <button id="close-person-template" class="icon-btn modal-close" type="button" aria-label="Close person editor">×</button>
+        </div>
+        <form id="people-library-form" class="modal-form">
+          <div class="ai-persona-panel">
+            <div class="field">
+              <label for="template-ai-description">Describe the persona you want</label>
+              <textarea id="template-ai-description" placeholder="Example: a content growth advisor for Xiaohongshu"></textarea>
+            </div>
+            <div class="template-actions template-ai-actions">
+              <p id="template-persona-generation-status" class="tiny" aria-live="polite"></p>
+              <button id="generate-template-persona" class="btn btn-ghost" type="button">Generate with AI</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="template-name">Person name</label>
+            <input id="template-name" type="text" maxlength="50" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="template-description">Description</label>
+            <textarea id="template-description"></textarea>
+          </div>
+          <div class="field">
+            <label for="template-prompt">Persona</label>
+            <textarea id="template-prompt"></textarea>
+          </div>
+          <div class="field">
+            <label>Default site</label>
+            <div class="site-segmented">
+              <label class="site-segment" for="template-site-gemini">
+                <input id="template-site-gemini" type="radio" name="template-chat-site" value="gemini">
+                <span>Gemini</span>
+              </label>
+              <label class="site-segment" for="template-site-chatgpt">
+                <input id="template-site-chatgpt" type="radio" name="template-chat-site" value="chatgpt">
+                <span>ChatGPT</span>
+              </label>
+              <label class="site-segment" for="template-site-claude">
+                <input id="template-site-claude" type="radio" name="template-chat-site" value="claude">
+                <span>Claude</span>
+              </label>
+              <label class="site-segment" for="template-site-deepseek">
+                <input id="template-site-deepseek" type="radio" name="template-chat-site" value="deepseek" checked="">
+                <span>DeepSeek</span>
+              </label>
+              <label class="site-segment" for="template-site-grok">
+                <input id="template-site-grok" type="radio" name="template-chat-site" value="grok">
+                <span>Grok</span>
+              </label>
+              <label class="site-segment" for="template-site-external">
+                <input id="template-site-external" type="radio" name="template-chat-site" value="external">
+                <span>External models</span>
+              </label>
+            </div>
+          </div>
+          <div id="template-chatgpt-gpts-field" class="field" hidden="">
+            <label for="template-chatgpt-gpts-url">GPTs link prefix</label>
+            <input id="template-chatgpt-gpts-url" type="url" autocomplete="off" placeholder="https://chatgpt.com/g/...">
+            <p class="tiny">Optional. After saving, this person opens this GPT first when using ChatGPT.</p>
+          </div>
+          <div id="template-grok-project-field" class="field" hidden="">
+            <label for="template-grok-project-url">Grok project URL</label>
+            <input id="template-grok-project-url" type="url" autocomplete="off" placeholder="https://grok.com/project/...">
+            <p class="tiny">Optional. After saving, this person opens this project first when using Grok.</p>
+          </div>
+          <div id="template-external-model-field" class="field" hidden="">
+            <label for="template-external-model-select">External models</label>
+            <select id="template-external-model-select"></select>
+          </div>
+          <div class="template-actions">
+            <button class="btn btn-primary" type="submit">Save person</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div id="builtin-template-detail-modal" class="modal-backdrop" hidden="">
+      <section class="modal template-detail-modal" role="dialog" aria-modal="true" aria-labelledby="builtin-template-detail-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="builtin-template-detail-title">Built-in people</h2>
+            <p id="builtin-template-detail-meta" class="tiny">System built-in person</p>
+          </div>
+          <button id="close-builtin-template-detail" class="icon-btn modal-close" type="button" aria-label="Close built-in person details">×</button>
+        </div>
+        <pre id="builtin-template-detail-prompt" class="template-prompt-preview"></pre>
+      </section>
+    </div>
+
+    <div id="add-person-modal" class="modal-backdrop" hidden="">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="add-person-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="add-person-title">Add people</h2>
+            <p class="tiny">Choose people from the library or temporary drafts, and assign a site to each.</p>
+          </div>
+          <div class="modal-header-actions">
+            <button id="open-temporary-person" class="btn btn-ghost" type="button">Add temporary</button>
+          <button id="close-add-person" class="icon-btn modal-close" type="button" aria-label="Close add people">×</button>
+          </div>
+        </div>
+        <div class="modal-grid single-column">
+          <form id="add-library-people-form" class="modal-form modal-card modal-grid-wide">
+            <h3>Choose people</h3>
+            <div class="add-person-toolbar">
+              <input id="add-person-search" aria-label="Search people" type="search" placeholder="Search people names, descriptions, or prompts" autocomplete="off">
+              <div class="template-type-tabs" role="tablist" aria-label="Agent type">
+                <button id="add-person-tab-custom" role="tab" aria-controls="add-library-people-list" class="template-type-tab active" type="button" data-template-type="custom">Custom people</button>
+                <button id="add-person-tab-builtin" role="tab" aria-controls="add-library-people-list" class="template-type-tab" type="button" data-template-type="builtin">Built-in people</button>
+              </div>
+              <div id="add-person-category-filter" class="template-category-filter" aria-label="People categories"></div>
+            </div>
+            <div id="add-library-people-list" role="tabpanel" aria-labelledby="add-person-tab-custom" class="select-list"></div>
+            <button class="btn btn-primary" type="submit">Add selected agents</button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div id="temporary-person-modal" class="modal-backdrop" hidden="">
+      <section class="modal template-editor-modal" role="dialog" aria-modal="true" aria-labelledby="temporary-person-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="temporary-person-title">Add temporary</h2>
+            <p class="tiny">Temporary agents enter the selection list first and join the current group chat only after confirmation.</p>
+          </div>
+          <button id="close-temporary-person" class="icon-btn modal-close" type="button" aria-label="Close temporary agent addition">×</button>
+        </div>
+          <form id="add-temporary-person-form" class="modal-form">
+            <div class="field">
+              <label for="temporary-person-name">Person name</label>
+              <input id="temporary-person-name" type="text" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="temporary-person-description">Description</label>
+              <textarea id="temporary-person-description"></textarea>
+            </div>
+            <div class="field">
+              <label for="temporary-person-prompt">Persona</label>
+              <textarea id="temporary-person-prompt"></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Add to selection list</button>
+          </form>
+      </section>
+    </div>
+
+    <div id="orchestration-modal" class="modal-backdrop" hidden="">
+      <section class="modal orchestration-modal" role="dialog" aria-modal="true" aria-labelledby="orchestration-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="orchestration-title">Orchestrate task</h2>
+            <p class="tiny">Canvas nodes execute in connection order. Multiple agents in the same node work in parallel.</p>
+          </div>
+          <button id="close-orchestration" class="icon-btn modal-close" type="button" aria-label="Close task orchestration">×</button>
+        </div>
+        <div class="orchestration-task-strip">
+          <label class="field" for="orchestration-task">Task</label>
+          <div class="orchestration-task-input-row">
+            <textarea id="orchestration-task" placeholder="Describe the task for the workflow to complete. You do not need to @mention agents."></textarea>
+            <button id="open-orchestration-template" class="btn orchestration-template-trigger" type="button">Template</button>
+            <button id="auto-orchestration" class="btn orchestration-auto" type="button">Automatic orchestration</button>
+          </div>
+        </div>
+        <div class="orchestration-layout">
+          <aside class="orchestration-sidebar">
+            <div class="section-title">
+              <h3 id="workflow-people-title">Teammates</h3>
+              <span id="workflow-people-help" class="tiny">Select or drag to add a node.</span>
+            </div>
+            <div id="orchestration-people-list" class="orchestration-people-list"></div>
+          </aside>
+          <section class="orchestration-workspace">
+            <button id="arrange-orchestration" class="btn orchestration-arrange" type="button">Organize</button>
+            <div id="orchestration-stage-canvas" class="orchestration-stage-canvas"></div>
+            <p id="orchestration-empty-hint" class="orchestration-empty-hint"></p>
+          </section>
+          <aside class="orchestration-settings">
+            <div class="orchestration-settings-heading">
+              <h3>Node settings</h3>
+              <span class="tiny">Select a canvas node to edit</span>
+            </div>
+            <div id="orchestration-stage-settings" class="orchestration-stage-settings"></div>
+            <div id="orchestration-review-settings" class="orchestration-review-settings"></div>
+          </aside>
+        </div>
+        <div class="orchestration-footer">
+          <label class="field orchestration-rounds-field" for="orchestration-max-rounds">
+            <span>Maximum node executions</span>
+            <input id="orchestration-max-rounds" type="number" min="1" max="200" value="50">
+          </label>
+          <p class="tiny">Defaults to 50, up to 200. Prevents workflows from looping indefinitely. Both execution and review nodes count toward the limit.</p>
+          <div class="template-actions orchestration-actions">
+            <button id="save-orchestration" class="btn" type="button">Save</button>
+            <button id="run-orchestration" class="btn btn-primary" type="button">Run</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="orchestration-auto-modal" class="modal-backdrop modal-backdrop-secondary" hidden="">
+      <section class="modal orchestration-auto-modal" role="dialog" aria-modal="true" aria-labelledby="orchestration-auto-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="orchestration-auto-title">Automatic orchestration</h2>
+            <p class="tiny">Generate or modify a workflow based on the task and your additional instructions.</p>
+          </div>
+          <button id="close-auto-orchestration" class="icon-btn modal-close" type="button" aria-label="Close automatic orchestration">×</button>
+        </div>
+        <div id="orchestration-auto-content" class="orchestration-auto-content"></div>
+      </section>
+    </div>
+
+    <div id="orchestration-template-modal" class="modal-backdrop modal-backdrop-secondary" hidden="">
+      <section class="modal orchestration-template-modal" role="dialog" aria-modal="true" aria-labelledby="orchestration-template-title">
+        <div class="modal-header">
+          <div>
+            <h2 id="orchestration-template-title">Select an orchestration template</h2>
+            <p class="tiny">Apply a structure first, then adjust agents and nodes for the current task.</p>
+          </div>
+          <button id="close-orchestration-template" class="icon-btn modal-close" type="button" aria-label="Close template selection">×</button>
+        </div>
+        <div id="orchestration-template-content" class="orchestration-template-content"></div>
+      </section>
+    </div>
+
+    <button id="chat-sidebar-backdrop" class="chat-sidebar-backdrop" type="button" aria-label="Close chats" hidden=""></button>
+    <div id="iframe-host" class="iframe-host" aria-hidden="true"></div>
+    <div id="error" class="toast" role="status" aria-atomic="true" hidden=""></div>
+    <script type="module" src="composer-files.js"></script>
+    <script type="module" src="team.js"></script>
+  
+
+</body></html>

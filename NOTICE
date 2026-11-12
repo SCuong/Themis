@@ -1,0 +1,52 @@
+Themis
+=======
+
+Themis is a modified version of OpenTeam (https://github.com/afumu/openteam),
+distributed under the PolyForm Noncommercial License 1.0.0. The full license
+text is in the LICENSE file and at
+https://polyformproject.org/licenses/noncommercial/1.0.0
+
+Required Notice: Copyright (c) 2026 OpenTeam contributors.
+
+Origin
+------
+This repository contains the built (bundled) JavaScript of OpenTeam v1.0.3,
+modified to create Themis. It is not the original TypeScript source; the
+upstream source lives in the OpenTeam repository linked above.
+
+Changes made in Themis (2026)
+-----------------------------
+- Renamed the product, storage keys and internal identifiers from OpenTeam to Themis.
+- Removed the local CLI control client (the websocket link to an external
+  "OpenTeam CLI" daemon) and its settings.
+- Translated the built-in persona library, team templates and remaining
+  Chinese interface text into English.
+- Added file attachments in the composer (pick, paste, drag and drop), a side
+  file viewer (images, video, audio, PDF, Markdown, DOCX and plain text) and
+  delivery of attached files to each AI site.
+- Added an optional step that deletes a chat's conversations on the AI sites
+  when the chat is deleted.
+- Redesigned parts of the interface: neutral color theme, shared message and
+  composer column, chat list grouped by date, and assorted fixes.
+- Added automated tests for the above.
+
+These changes are distributed under the same PolyForm Noncommercial License
+1.0.0. Use of Themis is limited to the noncommercial purposes that license
+permits.
+
+Third-party software
+--------------------
+The bundled files include third-party open-source libraries carried over from
+the OpenTeam build, including markdown-it, linkify-it, Tiptap and ProseMirror,
+zod and the Vercel AI SDK. Each remains under its own license.
+
+The interface icons are from Phosphor Icons (https://phosphoricons.com), under the
+MIT License; see assets/icons/PHOSPHOR-LICENSE.txt.
+
+vendor/mammoth-1.8.0.browser.min.js is mammoth.js 1.8.0 by Michael Williamson,
+under the BSD 2-Clause License; see vendor/mammoth-1.8.0.LICENSE.
+
+Trademarks
+----------
+Claude, ChatGPT, Gemini, Grok and DeepSeek are trademarks of their respective
+owners. Themis is not affiliated with or endorsed by any of them.
