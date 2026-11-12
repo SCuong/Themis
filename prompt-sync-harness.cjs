@@ -2,6 +2,7 @@
 // drive the same onMessage router the extension uses and read the exact prompt
 // text handed to chrome.tabs.sendMessage.
 const { pathToFileURL } = require('node:url');
+const { importSource, dist } = require('./test-support/source.cjs');
 require('fake-indexeddb/auto'); // spec-accurate IndexedDB for the image and file stores
 
 const SITE_URL = {
@@ -63,8 +64,8 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
     },
   };
 
-  const shared = await import(pathToFileURL(require.resolve('./assets/imageAttachmentRepository-DBrzc-g8.js')).href);
-  const store = shared.C();
+  const shared = await importSource('test-support/shared.ts');
+  const store = shared.createDefaultStore();
   store.settings.language = language;
   store.chatsById.chat = { id: 'chat', name: 'Test', mode, roleIds: [], messageIds: [], nextMessageSeq: 1, status: 'ready', createdAt: 1, updatedAt: 1 };
   store.chatOrder = ['chat'];
@@ -74,10 +75,10 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
     role.frameId = index + 1;
   });
   seed?.(store);
-  if (!restart) await shared.F(store);
+  if (!restart) await shared.saveStore(store);
 
   instance += 1;
-  await import(`${pathToFileURL(require.resolve('./background.js')).href}?instance=${instance}`);
+  await import(`${pathToFileURL(dist('background.js')).href}?instance=${instance}`);
 
   const frameOf = roleId => roles.find(role => role.id === roleId).frameId;
   const send = (message, roleId) => new Promise((resolve, reject) => {

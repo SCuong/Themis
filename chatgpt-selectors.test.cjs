@@ -1,8 +1,9 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
+const { dist } = require('./test-support/source.cjs');
 
-const bundle = readFileSync(require.resolve('./content.js'), 'utf8');
+const bundle = readFileSync(dist('content.js'), 'utf8');
 const adapter = bundle.slice(bundle.indexOf('unified-composer'));
 const composer = adapter.split("',sendButton:")[0];
 const responses = adapter.match(/response:'([^']+)',imageResponse:/)?.[1];

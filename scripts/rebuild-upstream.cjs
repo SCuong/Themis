@@ -1,5 +1,6 @@
 // Rebuilds the OpenTeam v1.0.3 release that Themis was made from, from its TypeScript source, and lists
-// which shipped Themis files are identical to that build and which were changed by hand.
+// which files of the Themis build (dist/, npm run build) are identical to it. Since Themis builds from its
+// own copy of that source (src/), this is a reference point for reviewing what Themis changed.
 //   npm run rebuild:upstream          (needs git, network and a few minutes)
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -25,9 +26,9 @@ const list = dir => readdirSync(dir, { recursive: true, withFileTypes: true })
   .map(e => path.relative(dir, path.join(e.parentPath ?? e.path, e.name)).replaceAll('\\', '/'));
 
 const rows = list(dist).map(file => {
-  const ours = path.join(root, file);
-  const state = !existsSync(ours) ? 'not shipped by Themis' : hash(ours) === hash(path.join(dist, file)) ? 'identical' : 'modified by Themis';
+  const ours = path.join(root, 'dist', file);
+  const state = !existsSync(ours) ? 'not in the Themis build' : hash(ours) === hash(path.join(dist, file)) ? 'identical' : 'changed by Themis';
   return [file, state];
 });
-for (const [file, state] of rows.sort()) console.log(`${state.padEnd(22)} ${file}`);
+for (const [file, state] of rows.sort()) console.log(`${state.padEnd(24)} ${file}`);
 console.log(`\nUpstream build: ${dist}`);

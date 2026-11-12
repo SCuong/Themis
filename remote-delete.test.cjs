@@ -4,6 +4,9 @@ const { readFileSync } = require('node:fs');
 const { test, after } = require('node:test');
 const { JSDOM } = require('jsdom');
 const { startThemis } = require('./prompt-sync-harness.cjs');
+const { sourceScript } = require('./test-support/source.cjs');
+
+const contentScript = sourceScript('test-support/content.ts', 'themisContent');
 
 after(() => setImmediate(() => process.exit(0))); // background.js keeps keepalive timers alive
 
@@ -51,8 +54,6 @@ test('with opt-in, each supported member with a conversation gets one delete, an
 // Runs the content-script delete in a page of the given site with a recording fetch.
 async function deleteOnSite(host, siteId, conversationId, { cookie = '', storage = {}, html = '<!doctype html>', responses }) {
   const dom = new JSDOM(html, { url: `https://${host}/`, runScripts: 'outside-only' });
-  const source = readFileSync(require.resolve('./content.js'), 'utf8');
-  const fn = source.slice(source.indexOf('async function otDeleteConversation'), source.indexOf('async function Hr('));
   const calls = [];
   dom.window.document.cookie = cookie;
   for (const [key, value] of Object.entries(storage)) dom.window.localStorage.setItem(key, value);
@@ -61,7 +62,7 @@ async function deleteOnSite(host, siteId, conversationId, { cookie = '', storage
     const body = responses[url.replace(`https://${host}`, '').split('?')[0]] ?? {};
     return { ok: body.status === undefined || body.status < 400, status: body.status ?? 200, json: async () => body.json ?? {}, text: async () => body.text ?? '' };
   };
-  dom.window.eval(`var x={id:${JSON.stringify(siteId)}},y={info(){}};${fn};window.run=otDeleteConversation;`);
+  dom.window.eval(`${contentScript};window.run=id=>themisContent.deleteConversation(id,${JSON.stringify(siteId)},{info(){}});`);
   try { return { result: await dom.window.run(conversationId), calls }; } finally { dom.window.close(); }
 }
 

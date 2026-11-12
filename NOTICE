@@ -10,9 +10,9 @@ Required Notice: Copyright (c) 2026 OpenTeam contributors.
 
 Origin
 ------
-This repository contains the built (bundled) JavaScript of OpenTeam v1.0.3,
-modified to create Themis. It is not the original TypeScript source; the
-upstream source lives in the OpenTeam repository linked above.
+This repository contains the TypeScript source of OpenTeam v1.0.3 (commit
+8ef6f37e5fb070c9cb3fb2217837bb4aba2c27d2), modified to create Themis. The
+upstream repository is linked above.
 
 Changes made in Themis (2026)
 -----------------------------
@@ -36,8 +36,7 @@ permits.
 
 Third-party software
 --------------------
-The bundled files include third-party open-source libraries carried over from
-the OpenTeam build, including markdown-it, linkify-it, Tiptap and ProseMirror,
+The built files include third-party open-source libraries used by OpenTeam, including markdown-it, linkify-it, Tiptap and ProseMirror,
 zod and the Vercel AI SDK. Each remains under its own license.
 
 The interface icons are from Phosphor Icons (https://phosphoricons.com), under the

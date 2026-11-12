@@ -5,11 +5,12 @@ const assert = require('node:assert/strict');
 const { test, after } = require('node:test');
 const { pathToFileURL } = require('node:url');
 const { startThemis } = require('./prompt-sync-harness.cjs'); // also installs fake-indexeddb
+const { importSource } = require('./test-support/source.cjs');
 
 after(() => setImmediate(() => process.exit(0))); // background.js keeps keepalive timers alive
 
 const QUEUE = 'themis.cleanupQueue';
-const images = async () => (await import(pathToFileURL(require.resolve('./assets/imageAttachmentRepository-DBrzc-g8.js')).href)).B();
+const images = async () => (await importSource('test-support/shared.ts')).createIndexedDbImageAttachmentRepository();
 
 function filesDb() {
   return new Promise((resolve, reject) => {

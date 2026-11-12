@@ -139,7 +139,7 @@ function applyExternalMemoryPatch(store: OpenTeamStore, patch: ExternalMemoryPat
   }
 }
 
-function shouldIncludePersonaForPrompt(role: GroupRole, signature: string): boolean {
+export function shouldIncludePersonaForPrompt(role: GroupRole, signature: string): boolean {
   return !roleUsesChatGptGptsPersona(role) && role.promptSync?.signature !== signature
 }
 

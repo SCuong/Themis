@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const { JSDOM } = require('jsdom');
+const { sourceScript } = require('./test-support/source.cjs');
+
+const contentScript = sourceScript('test-support/content.ts', 'themisContent');
 
 function createAdapter(host, html, name) {
   const dom = new JSDOM(html, {
@@ -9,11 +12,8 @@ function createAdapter(host, html, name) {
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });
-  const source = readFileSync(require.resolve('./content.js'), 'utf8');
-  const end = source.indexOf('var Tt="__THEMIS_LOADED__"');
-  assert.ok(end > 0);
-  // Execute production adapter functions, stopping before extension boot and runtime messaging.
-  dom.window.eval(source.slice(0, end) + 'window.adapters={chatgpt:Qe,gemini:pt,deepseek:it};window.collectReply=le;})();');
+  // The real adapter modules, without the content script's boot and runtime messaging.
+  dom.window.eval(contentScript + ';window.adapters={chatgpt:themisContent.createChatGptAdapter,gemini:themisContent.createGeminiAdapter,deepseek:themisContent.createDeepSeekAdapter};window.collectReply=themisContent.resolveReportableReplyText;');
   return { dom, adapter: dom.window.adapters[name]({ inputTimeoutMs: 800 }) };
 }
 

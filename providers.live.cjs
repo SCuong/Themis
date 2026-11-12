@@ -1,4 +1,4 @@
-// Live check against the real AI sites: runs content.js's own site adapter in each page, sends one short
+// Live check against the real AI sites: runs the content script's own site adapter in each page, sends one short
 // prompt and waits for the reply. Catches site markup changes that the JSDOM fixture tests cannot.
 //
 //   npm run test:live:login   opens Chrome on a dedicated profile; sign in to each site, then close it
@@ -6,8 +6,8 @@
 //
 // Not part of `npm test` or CI: it needs signed-in accounts and uses a little of each site's quota.
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
 const path = require('node:path');
+const { sourceScript } = require('./test-support/source.cjs');
 const { test, after } = require('node:test');
 const { chromium } = require('playwright-core');
 
@@ -22,10 +22,8 @@ const chrome = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Applic
 const profile = process.env.THEMIS_LIVE_PROFILE || path.join(__dirname, 'test-results', 'live-profile');
 const picked = (process.env.THEMIS_LIVE_SITES || Object.keys(SITES).join(',')).split(',').map(s => s.trim()).filter(Boolean);
 
-const source = readFileSync(require.resolve('./content.js'), 'utf8');
-const end = source.indexOf('var Tt="__THEMIS_LOADED__"');
-// Same cut as provider-dom.test.cjs: the adapter code, without extension boot and runtime messaging.
-const adapterScript = source.slice(0, end) + 'window.__themisAdapter=Et();})();';
+// The real site adapters from source, without the content script's boot and runtime messaging.
+const adapterScript = sourceScript('test-support/content.ts', 'themisContent') + ';window.__themisAdapter=themisContent.getActiveChatSiteAdapter();';
 
 async function launch() {
   // Headed: several sites refuse headless browsers.
@@ -40,7 +38,6 @@ if (process.argv.includes('--login')) {
     await new Promise(resolve => context.on('close', resolve));
   })();
 } else {
-  assert.ok(end > 0, 'content.js layout changed: adapter boot marker not found');
   let context;
   after(() => context?.close());
 

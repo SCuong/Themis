@@ -70,44 +70,48 @@ Everything below is implemented in this repository and covered at least partly b
 
 Themis is a Manifest V3 Chrome extension. There is no backend.
 
-| Part | File | Role |
-|---|---|---|
-| Workspace page | `team.html`, `team.js`, `team-ui.js`, `composer-files.js`, CSS | The chat, people library, orchestration canvas, notes and settings UI |
-| Background service worker | `background.js` | Stores state, routes messages to members, runs orchestration, calls external API models (via the Vercel AI SDK) |
-| Content script | `content.js` | Runs inside each AI site's page: types the prompt, pastes attachments, presses send and reads the reply back |
-| Shared module | `assets/imageAttachmentRepository-*.js` | Store schema and migrations, personas, team templates and helpers used by the other parts |
-| Network rules | `background.js` (session rules) | Lets the AI sites load inside workspace tabs only (see [Security and privacy](#security-and-privacy)) |
+| Part | Source | Built file | Role |
+|---|---|---|---|
+| Workspace page | `src/teamPage/`, `team.html`, `team-ui.js`, `composer-files.js`, `localization.js`, CSS | `team.js` | The chat, people library, orchestration canvas, notes and settings UI |
+| Background service worker | `src/background/` | `background.js` | Stores state, routes messages to members, runs orchestration, calls external API models (via the Vercel AI SDK) |
+| Content script | `src/content/` | `content.js` | Runs inside each AI site's page: types the prompt, pastes attachments, presses send and reads the reply back |
+| Shared code | `src/group/`, `src/shared/` | `assets/imageAttachmentRepository.js` | Store schema and migrations, personas, team templates and helpers used by the other parts |
+| Network rules | `src/background/frameRules.ts` | `background.js` | Lets the AI sites load inside workspace tabs only (see [Security and privacy](#security-and-privacy)) |
 
 For website members, Themis embeds each AI site in a frame inside the workspace and drives it with the content script, using your existing signed-in session. Each member gets its own frame and its own conversation, so several members can use the same site. For API members, the background worker calls the provider directly with the key you entered.
 
 Data lives in your browser: chats, personas and settings in `chrome.storage.local`, and images and attachments in IndexedDB.
 
-**About this codebase:** this repository holds the built JavaScript of OpenTeam v1.0.3 with Themis's changes applied on top. Most files are bundled and minified, so this is not a convenient place to make large changes. The original TypeScript source is in the [OpenTeam repository](https://github.com/afumu/openteam).
+**About this codebase:** `src/` is the TypeScript source of OpenTeam v1.0.3 (commit `8ef6f37`) with Themis's changes. `npm run build` bundles it with Vite and esbuild into `dist/`, together with the hand-written files that ship as they are (`team.html`, `team.css`, `team-refinements.css`, `team-ui.js`, `composer-files.js`, `localization.js`, `profile-avatars.js`, `manifest.json`, `vendor/`, `assets/icons/`, `assets/profile-atlas.webp`). `dist/` is build output and is not committed.
 
 ## Install
 
 Themis is not on the Chrome Web Store. Load it as an unpacked extension:
 
-1. Clone this repository, or download it as a ZIP and extract it.
+1. Clone this repository, then build it (Node.js 24): `npm ci` and `npm run build`.
 2. Open `chrome://extensions` and switch on **Developer mode**.
-3. Click **Load unpacked** and select the repository folder (the one containing `manifest.json`).
+3. Click **Load unpacked** and select the `dist` folder.
 4. Click the Themis icon in the toolbar to open the workspace.
 5. Sign in to the AI sites you want to use (Gemini, ChatGPT, Claude, DeepSeek, Grok) in the same Chrome profile.
 6. Optional: open **Models** to add an API model.
-
-No build step is needed; the extension runs from the files as they are.
 
 ## Development
 
 The checks and tests use Node.js (developed with Node.js 24).
 
 ```bash
-npm install
-npm run check   # syntax check of the extension's scripts
-npm test        # unit, background-harness and browser UI tests
+npm ci
+npm run build   # src/ and the hand-written files -> dist/ (the unpacked extension)
+npm run check   # TypeScript type check and a syntax check of the built scripts
+npm test        # unit, background-harness and browser UI tests (needs the build)
+npm run hashes  # SHA-256 of every file in dist/
 ```
 
-GitHub Actions runs `npm run check` and `npm test` on every push and pull request (`.github/workflows/test.yml`).
+GitHub Actions runs `npm ci`, `npm run build`, `npm run check`, `npm test` and `npm run hashes` on every push and pull request (`.github/workflows/test.yml`).
+
+**Reproducible builds.** Dependencies are pinned by `package-lock.json`, line endings by `.gitattributes`, and the build has no timestamps or random names, so two builds of the same commit give the same bytes. `npm run hashes` prints the hash of every file in `dist/` and one hash over the list; compare that last line between builds.
+
+**Tests and source.** Tests that check a single part load it from `src/` through `test-support/source.cjs`, which bundles the module with esbuild on the fly (`test-support/*.ts` list what each group of tests uses). Tests of the whole extension run the built files in `dist/`.
 
 **Live check against the real AI sites.** The tests above use simulated pages, so they cannot notice when a site changes its markup. `providers.live.cjs` runs the extension's own site adapters on the real sites: it sends one short prompt to each and waits for the reply.
 
@@ -118,15 +122,15 @@ npm run test:live         # THEMIS_LIVE_SITES=chatgpt,claude limits the sites
 
 It uses a separate Chrome profile in `test-results/live-profile`, uses a little of each account's quota, and is not run in CI.
 
-**Frame rules in a real browser.** `npm run test:frames` loads Themis unpacked in Playwright's Chromium (branded Chrome ignores `--load-extension`; run `npx playwright-core install chromium` once) and checks that each AI site can be framed in a workspace tab, stays blocked in an ordinary tab, keeps working after a navigation inside the frame, and loses the exception when the workspace tab closes or navigates away. It needs network access but no sign-in. In an automated browser Claude and Grok show a Cloudflare check and DeepSeek a 403 page, so for those three it proves the frame is allowed, not that the app works.
+**Frame rules in a real browser.** `npm run test:frames` loads `dist/` unpacked in Playwright's Chromium (branded Chrome ignores `--load-extension`; run `npx playwright-core install chromium` once) and checks that each AI site can be framed in a workspace tab, stays blocked in an ordinary tab, keeps working after a navigation inside the frame, and loses the exception when the workspace tab closes or navigates away. It needs network access but no sign-in. In an automated browser Claude and Grok show a Cloudflare check and DeepSeek a 403 page, so for those three it proves the frame is allowed, not that the app works.
 
-**Rebuilding the upstream base.** `npm run rebuild:upstream` builds OpenTeam v1.0.3 (commit `8ef6f37`) from its TypeScript source and lists which shipped files are identical to that build and which Themis changed. Today `assets/index-Cvqzct0I.js` and `assets/tiptapNoteEditor-DPZh58fM.js` are byte-identical; `background.js`, `content.js`, `team.js`, `team.html`, `team.css`, `manifest.json` and `assets/imageAttachmentRepository-DBrzc-g8.js` carry Themis's changes, which were made to the built files directly. The files Themis added (`composer-files.js`, `team-ui.js`, `localization.js`, `profile-avatars.js`, `team-refinements.css`) are plain, unminified source.
+**Comparing with upstream.** `npm run rebuild:upstream` builds OpenTeam v1.0.3 (commit `8ef6f37`) from its own repository into `test-results/upstream/dist` and lists which files of `dist/` are identical to it. Since `src/` started as that exact source (the first commit of the port builds byte-identical to the upstream release), `git log -p -- src` shows every change Themis made to it.
 
 - The browser UI tests drive Google Chrome through `playwright-core` and expect Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` (see `ui-fixture.cjs`). Change that path on macOS or Linux.
-- `prompt-sync-harness.cjs` loads the real `background.js` against a fake `chrome` API, so message routing can be tested without a browser.
-- `node preview-server.cjs 5173` serves the workspace page at `http://localhost:5173/team.html` for UI work, with sample data and no real AI sites.
+- `prompt-sync-harness.cjs` loads the built `dist/background.js` against a fake `chrome` API, so message routing can be tested without a browser.
+- `node preview-server.cjs 5173` serves the built workspace page from `dist/` at `http://localhost:5173/team.html` for UI work, with sample data and no real AI sites.
 
-**Current results** (at the commit in this repository): `npm run check` passes, and `npm test` runs 72 tests. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
+**Current results** (at the commit in this repository): `npm run build` and `npm run check` pass, `npm test` runs 72 tests and `npm run test:frames` 8. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
 
 ## Limitations
 
@@ -136,7 +140,6 @@ It uses a separate Chrome profile in `test-results/live-profile`, uses a little 
 - **Personas are prompts, not people.** The thinking-style advisors are written to reflect public ideas. They are not affiliated with or endorsed by the people or organizations they are named after, and they can be wrong.
 - **Model output is not verified.** Reviews and critiques come from the models themselves. Treat them as input to your judgment, not as proof.
 - **Chrome only.** Themis has only been used with desktop Google Chrome.
-- **Bundled code.** Most of the code is minified build output, which makes auditing and modification harder than with the original source. Themis's changes to those files are not yet ported back to TypeScript source, so Themis itself cannot be rebuilt from source; `npm run rebuild:upstream` shows exactly which files differ from the reproducible upstream build.
 
 ## Security and privacy
 

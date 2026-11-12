@@ -5,8 +5,10 @@
   "description": "Chrome extension workspace for multi-AI group chat, critique and orchestration (modified from OpenTeam).",
   "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit -p . && node --check dist/background.js && node --check dist/content.js && node --check dist/team.js && node --check dist/assets/imageAttachmentRepository.js && node --check dist/team-ui.js && node --check dist/profile-avatars.js && node --check dist/localization.js && node --check dist/composer-files.js",
     "test": "node --test *.test.cjs",
-    "check": "node --check background.js && node --check content.js && node --check team.js && node --check assets/imageAttachmentRepository-DBrzc-g8.js && node --check team-ui.js && node --check profile-avatars.js && node --check localization.js",
+    "hashes": "node scripts/dist-hashes.cjs",
     "test:live": "node --test providers.live.cjs",
     "test:live:login": "node providers.live.cjs --login",
     "rebuild:upstream": "node scripts/rebuild-upstream.cjs",
