@@ -31,6 +31,11 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
   let sessionRules = [];
   const tabListeners = {};
   const tabEvent = name => ({ addListener(fn) { (tabListeners[name] ??= []).push(fn); } });
+  // A small cookie jar for chrome.cookies: unpartitioned cookies, plus partitioned ones (partitionKey).
+  const cookieJar = [];
+  const cookieListeners = [];
+  const samePartition = (cookie, key) => (cookie.partitionKey?.topLevelSite ?? null) === (key?.topLevelSite ?? null);
+  const sameCookie = (a, b) => a.name === b.name && (a.path ?? '/') === (b.path ?? '/') && samePartition(a, b.partitionKey);
   global.chrome = {
     storage: { local: {
       async get(keys) {
@@ -39,7 +44,13 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
       },
       async set(values) { Object.assign(memory, structuredClone(values)); },
       async remove(keys) { for (const key of [].concat(keys)) delete memory[key]; },
-    } },
+    }, session: (() => {
+      const data = {};
+      return {
+        async get(keys) { return keys == null ? structuredClone(data) : Object.fromEntries([].concat(keys).filter(k => k in data).map(k => [k, structuredClone(data[k])])); },
+        async set(values) { Object.assign(data, structuredClone(values)); },
+      };
+    })() },
     runtime: {
       id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: 'test' }),
       onInstalled: event, onStartup: event, sendMessage: async () => ({}),
@@ -48,6 +59,22 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
     declarativeNetRequest: {
       async updateSessionRules({ removeRuleIds = [], addRules = [] }) { sessionRules = [...sessionRules.filter(r => !removeRuleIds.includes(r.id)), ...structuredClone(addRules)]; },
       async getSessionRules() { return structuredClone(sessionRules); },
+    },
+    cookies: {
+      async getAll({ domain, partitionKey }) {
+        return structuredClone(cookieJar.filter(c => c.domain.replace(/^\./, '').endsWith(domain) && samePartition(c, partitionKey)));
+      },
+      async set({ url, domain, path = '/', partitionKey, ...rest }) {
+        const cookie = { ...rest, path, domain: domain ?? new URL(url).hostname, hostOnly: !domain, ...(partitionKey ? { partitionKey } : {}) };
+        const at = cookieJar.findIndex(c => sameCookie(c, cookie));
+        if (at >= 0) cookieJar.splice(at, 1, cookie); else cookieJar.push(cookie);
+        return cookie;
+      },
+      async remove({ url, name, partitionKey }) {
+        const at = cookieJar.findIndex(c => sameCookie(c, { name, path: new URL(url).pathname, partitionKey }));
+        if (at >= 0) cookieJar.splice(at, 1);
+      },
+      onChanged: { addListener(fn) { cookieListeners.push(fn); } },
     },
     action: { onClicked: event },
     alarms: { create() {}, onAlarm: event },
@@ -100,6 +127,8 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
     memory,
     tabs,
     async fireTab(name, ...args) { for (const fn of tabListeners[name] ?? []) fn(...args); await new Promise(r => setTimeout(r, 20)); },
+    cookieJar,
+    async fireCookie(change) { for (const fn of cookieListeners) fn(change); await new Promise(r => setTimeout(r, 20)); },
     sessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
     prompts,
     frameMessages,

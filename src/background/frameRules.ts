@@ -1,6 +1,8 @@
 // The AI sites refuse to be framed (CSP frame-ancestors, X-Frame-Options). A session rule strips those
 // headers, but only for sub-frames inside open Themis tabs, so ordinary browsing keeps the protection.
 // The rule's tab list is rebuilt whenever a tab opens, navigates, closes or is replaced.
+import { syncGrokCookies, watchGrokCookies } from './grokCookies'
+
 const FRAME_RULE_ID = 1
 const AI_DOMAINS = ['gemini.google.com', 'chatgpt.com', 'chat.openai.com', 'claude.ai', 'chat.deepseek.com', 'grok.com']
 
@@ -24,18 +26,23 @@ function frameRule(tabIds: number[]): chrome.declarativeNetRequest.Rule {
   }
 }
 
+async function themisTabIds(): Promise<number[]> {
+  const base = chrome.runtime.getURL('team.html')
+  return (await chrome.tabs.query({}))
+    .filter(tab => (tab.pendingUrl || tab.url || '').startsWith(base))
+    .map(tab => tab.id)
+    .filter(Number.isInteger) as number[]
+}
+
 let syncChain: Promise<void> = Promise.resolve()
 
 export function syncFrameRules(log: FrameRulesLogger): Promise<void> {
   return syncChain = syncChain.catch(() => {}).then(async () => {
     const dnr = chrome.declarativeNetRequest
     if (!dnr?.updateSessionRules || !chrome.tabs.query) return
-    const base = chrome.runtime.getURL('team.html')
-    const tabIds = (await chrome.tabs.query({}))
-      .filter(tab => (tab.pendingUrl || tab.url || '').startsWith(base))
-      .map(tab => tab.id)
-      .filter(Number.isInteger) as number[]
+    const tabIds = await themisTabIds()
     await dnr.updateSessionRules({ removeRuleIds: [FRAME_RULE_ID], addRules: tabIds.length ? [frameRule(tabIds)] : [] })
+    await syncGrokCookies(tabIds.length > 0)
     log.debug('frame-rules:synced', { tabIds })
   }).catch(error => log.warn('frame-rules:sync-failed', { error: error instanceof Error ? error.message : String(error) }))
 }
@@ -51,5 +58,6 @@ export function registerFrameRuleSync(log: FrameRulesLogger): void {
   chrome.tabs.onRemoved.addListener(sync)
   chrome.tabs.onReplaced?.addListener(sync)
   chrome.runtime.onStartup.addListener(sync)
+  watchGrokCookies(async () => (await themisTabIds()).length > 0, log)
   sync()
 }

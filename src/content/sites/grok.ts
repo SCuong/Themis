@@ -281,8 +281,17 @@ function isLikelyAssistantResponse(element: Element): boolean {
   return extractCleanText(element).length > 0
 }
 
+// While its connection is down Grok puts "Reconnecting…" (or "Connection lost") in the reply bubble. That is
+// not an answer: keep waiting, so Themis neither records it as the reply nor stops the turn.
+const CONNECTION_STATUS = /^(reconnecting|connecting|connection lost)\b/i
+
+function showsConnectionStatus(): boolean {
+  const latest = [...document.querySelectorAll(GROK_SELECTORS.response)].pop()
+  return Boolean(latest && CONNECTION_STATUS.test((latest.textContent || '').trim()))
+}
+
 function isGrokGenerating(): boolean {
-  return Boolean(findGrokStopButton() || [...document.querySelectorAll(GROK_SELECTORS.activityIndicator)].find(isVisibleInteractiveElement))
+  return Boolean(findGrokStopButton() || [...document.querySelectorAll(GROK_SELECTORS.activityIndicator)].find(isVisibleInteractiveElement) || showsConnectionStatus())
 }
 
 async function stopGrokGenerating(): Promise<boolean> {

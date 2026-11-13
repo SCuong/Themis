@@ -13,7 +13,7 @@ function createAdapter(host, html, name) {
     pretendToBeVisual: true,
   });
   // The real adapter modules, without the content script's boot and runtime messaging.
-  dom.window.eval(contentScript + ';window.adapters={chatgpt:themisContent.createChatGptAdapter,claude:themisContent.createClaudeAdapter,gemini:themisContent.createGeminiAdapter,deepseek:themisContent.createDeepSeekAdapter};window.collectReply=themisContent.resolveReportableReplyText;');
+  dom.window.eval(contentScript + ';window.adapters={chatgpt:themisContent.createChatGptAdapter,claude:themisContent.createClaudeAdapter,grok:themisContent.createGrokAdapter,gemini:themisContent.createGeminiAdapter,deepseek:themisContent.createDeepSeekAdapter};window.collectReply=themisContent.resolveReportableReplyText;');
   return { dom, adapter: dom.window.adapters[name]({ inputTimeoutMs: 800 }) };
 }
 
@@ -136,5 +136,14 @@ test('Claude still reads the earlier .font-claude-response layout', () => {
   const { dom, adapter } = createAdapter('claude.ai', '<div class="font-claude-response"><p>Older layout reply.</p></div>', 'claude');
   try {
     assert.deepEqual(Array.from(adapter.getAllAssistantReplies()), ['Older layout reply.']);
+  } finally { dom.window.close(); }
+});
+
+test('Grok keeps waiting while its reply bubble only shows a connection status', () => {
+  const { dom, adapter } = createAdapter('grok.com', '<div data-testid="assistant-message"><span>Reconnecting…</span></div>', 'grok');
+  try {
+    assert.equal(adapter.isGenerating(), true);
+    dom.window.document.querySelector('[data-testid="assistant-message"]').innerHTML = '<p>THEMIS-GROK-TOKEN</p>';
+    assert.equal(adapter.isGenerating(), false);
   } finally { dom.window.close(); }
 });
