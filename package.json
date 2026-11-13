@@ -5,13 +5,38 @@
   "description": "Chrome extension workspace for multi-AI group chat, critique and orchestration (modified from OpenTeam).",
   "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit -p . && node --check dist/background.js && node --check dist/content.js && node --check dist/team.js && node --check dist/assets/imageAttachmentRepository.js && node --check dist/team-ui.js && node --check dist/profile-avatars.js && node --check dist/localization.js && node --check dist/composer-files.js",
     "test": "node --test *.test.cjs",
-    "check": "node --check background.js && node --check content.js && node --check team.js && node --check assets/imageAttachmentRepository-DBrzc-g8.js && node --check team-ui.js && node --check profile-avatars.js && node --check localization.js"
+    "hashes": "node scripts/dist-hashes.cjs",
+    "test:live": "node --test providers.live.cjs",
+    "test:live:login": "node providers.live.cjs --login",
+    "test:e2e": "node e2e.live.cjs",
+    "test:e2e:login": "node e2e.live.cjs --login",
+    "rebuild:upstream": "node scripts/rebuild-upstream.cjs",
+    "test:frames": "node --test --test-concurrency=1 frame-rules.browser.cjs"
   },
   "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^25.6.0",
     "acorn": "^8.15.0",
+    "fake-indexeddb": "^6.2.8",
     "jsdom": "^26.1.0",
-    "playwright-core": "^1.56.1"
+    "playwright-core": "^1.56.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.75",
+    "@ai-sdk/openai-compatible": "^2.0.46",
+    "@antv/x6": "^3.1.7",
+    "@tiptap/core": "^3.22.5",
+    "@tiptap/pm": "^3.22.5",
+    "@tiptap/starter-kit": "^3.22.5",
+    "ai": "^6.0.175",
+    "markdown-it": "^14.1.1",
+    "tslib": "^2.8.1"
+  }
 }

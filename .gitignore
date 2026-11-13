@@ -1,6 +1,7 @@
 # Dependencies and generated output
 node_modules/
 test-results/
+dist/
 
 # Chrome-generated extension cache
 _metadata/

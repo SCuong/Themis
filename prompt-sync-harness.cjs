@@ -2,6 +2,8 @@
 // drive the same onMessage router the extension uses and read the exact prompt
 // text handed to chrome.tabs.sendMessage.
 const { pathToFileURL } = require('node:url');
+const { importSource, dist } = require('./test-support/source.cjs');
+require('fake-indexeddb/auto'); // spec-accurate IndexedDB for the image and file stores
 
 const SITE_URL = {
   gemini: id => `https://gemini.google.com/app/${id}`,
@@ -14,8 +16,9 @@ let instance = 0;
 // The service worker logs every step; keep test output readable.
 console.log = console.info = console.debug = console.warn = () => {};
 
-async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
-  const memory = {};
+// Pass the memory of an earlier instance to restart the service worker on the same chrome.storage.
+async function startThemis({ mode = 'collaborative', language = 'vi', roles, seed, memory: restart }) {
+  const memory = restart ?? {};
   const prompts = [];
   // Every other message sent to a member frame, and an optional per-type responder for it.
   const frameMessages = [];
@@ -23,6 +26,16 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
   let listener;
   let failNextSend = 0;
   const event = { addListener() {} };
+  // Browser tabs and DNR session rules, for the per-tab frame rules.
+  const tabs = [];
+  let sessionRules = [];
+  const tabListeners = {};
+  const tabEvent = name => ({ addListener(fn) { (tabListeners[name] ??= []).push(fn); } });
+  // A small cookie jar for chrome.cookies: unpartitioned cookies, plus partitioned ones (partitionKey).
+  const cookieJar = [];
+  const cookieListeners = [];
+  const samePartition = (cookie, key) => (cookie.partitionKey?.topLevelSite ?? null) === (key?.topLevelSite ?? null);
+  const sameCookie = (a, b) => a.name === b.name && (a.path ?? '/') === (b.path ?? '/') && samePartition(a, b.partitionKey);
   global.chrome = {
     storage: { local: {
       async get(keys) {
@@ -31,16 +44,44 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
       },
       async set(values) { Object.assign(memory, structuredClone(values)); },
       async remove(keys) { for (const key of [].concat(keys)) delete memory[key]; },
-    } },
+    }, session: (() => {
+      const data = {};
+      return {
+        async get(keys) { return keys == null ? structuredClone(data) : Object.fromEntries([].concat(keys).filter(k => k in data).map(k => [k, structuredClone(data[k])])); },
+        async set(values) { Object.assign(data, structuredClone(values)); },
+      };
+    })() },
     runtime: {
       id: 'test', getURL: path => `chrome-extension://test/${path}`, getManifest: () => ({ version: 'test' }),
       onInstalled: event, onStartup: event, sendMessage: async () => ({}),
       onMessage: { addListener(fn) { listener = fn; } },
     },
+    declarativeNetRequest: {
+      async updateSessionRules({ removeRuleIds = [], addRules = [] }) { sessionRules = [...sessionRules.filter(r => !removeRuleIds.includes(r.id)), ...structuredClone(addRules)]; },
+      async getSessionRules() { return structuredClone(sessionRules); },
+    },
+    cookies: {
+      async getAll({ domain, partitionKey }) {
+        return structuredClone(cookieJar.filter(c => c.domain.replace(/^\./, '').endsWith(domain) && samePartition(c, partitionKey)));
+      },
+      async set({ url, domain, path = '/', partitionKey, ...rest }) {
+        const cookie = { ...rest, path, domain: domain ?? new URL(url).hostname, hostOnly: !domain, ...(partitionKey ? { partitionKey } : {}) };
+        const at = cookieJar.findIndex(c => sameCookie(c, cookie));
+        if (at >= 0) cookieJar.splice(at, 1, cookie); else cookieJar.push(cookie);
+        return cookie;
+      },
+      async remove({ url, name, partitionKey }) {
+        const at = cookieJar.findIndex(c => sameCookie(c, { name, path: new URL(url).pathname, partitionKey }));
+        if (at >= 0) cookieJar.splice(at, 1);
+      },
+      onChanged: { addListener(fn) { cookieListeners.push(fn); } },
+    },
     action: { onClicked: event },
     alarms: { create() {}, onAlarm: event },
     tabs: {
-      onRemoved: event, create: async () => ({}),
+      onRemoved: tabEvent('onRemoved'), onCreated: tabEvent('onCreated'), onUpdated: tabEvent('onUpdated'), onReplaced: tabEvent('onReplaced'),
+      create: async () => ({}),
+      async query() { return structuredClone(tabs); },
       async sendMessage(tabId, message, options) {
         if (message.type !== 'TEAM_SEND_PROMPT') { frameMessages.push({ ...message, frameId: options.frameId }); return frameResponders[message.type]?.(message) ?? { ok: true }; }
         if (failNextSend > 0) { failNextSend -= 1; throw new Error('Could not establish connection'); }
@@ -50,8 +91,8 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
     },
   };
 
-  const shared = await import(pathToFileURL(require.resolve('./assets/imageAttachmentRepository-DBrzc-g8.js')).href);
-  const store = shared.C();
+  const shared = await importSource('test-support/shared.ts');
+  const store = shared.createDefaultStore();
   store.settings.language = language;
   store.chatsById.chat = { id: 'chat', name: 'Test', mode, roleIds: [], messageIds: [], nextMessageSeq: 1, status: 'ready', createdAt: 1, updatedAt: 1 };
   store.chatOrder = ['chat'];
@@ -60,10 +101,11 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
     store.chatsById.chat.roleIds.push(role.id);
     role.frameId = index + 1;
   });
-  await shared.F(store);
+  seed?.(store);
+  if (!restart) await shared.saveStore(store);
 
   instance += 1;
-  await import(`${pathToFileURL(require.resolve('./background.js')).href}?instance=${instance}`);
+  await import(`${pathToFileURL(dist('background.js')).href}?instance=${instance}`);
 
   const frameOf = roleId => roles.find(role => role.id === roleId).frameId;
   const send = (message, roleId) => new Promise((resolve, reject) => {
@@ -82,6 +124,12 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
   };
 
   const api = {
+    memory,
+    tabs,
+    async fireTab(name, ...args) { for (const fn of tabListeners[name] ?? []) fn(...args); await new Promise(r => setTimeout(r, 20)); },
+    cookieJar,
+    async fireCookie(change) { for (const fn of cookieListeners) fn(change); await new Promise(r => setTimeout(r, 20)); },
+    sessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
     prompts,
     frameMessages,
     frameResponders,
