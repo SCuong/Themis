@@ -13,7 +13,7 @@
 // (a bot check or a missing sign-in kept the prompt from being answered; see the screenshot).
 // Summary, screenshots and console errors go to test-results/e2e/. Not part of `npm test` or CI: it needs
 // signed-in accounts and uses a little of each site's quota. Runs headed, since several sites refuse headless.
-const { mkdirSync, writeFileSync } = require('node:fs');
+const { mkdirSync, rmSync, writeFileSync } = require('node:fs');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
@@ -43,6 +43,9 @@ const SIGN_IN = /\b(log ?in|sign ?in|sign ?up|continue with google)\b/i;
 // prompt but never answers.
 const CDP_PORT = Number(process.env.THEMIS_E2E_CDP_PORT || 9333);
 async function launch() {
+  // Chrome keeps a registered extension service worker across runs and can keep running an older
+  // background.js than the one in dist/. Dropping the cache makes every run test the current build.
+  rmSync(path.join(profile, 'Default', 'Service Worker'), { recursive: true, force: true });
   const browser = spawn(chromium.executablePath(), [
     `--user-data-dir=${profile}`, `--remote-debugging-port=${CDP_PORT}`, '--no-first-run', '--no-default-browser-check',
     '--window-size=1440,900', ...(process.env.THEMIS_E2E_HEADLESS === '1' ? ['--headless=new'] : []),
@@ -112,11 +115,14 @@ async function run() {
     const trace = [];
     if (TRACE) {
       await worker.evaluate(() => { globalThis.THEMIS_DEBUG = true; });
+      context.on('response', r => { if (r.status() >= 400) trace.push(`${new Date().toISOString()} http ${r.status()} ${r.request().method()} ${r.url().split('?')[0]} | frame ${r.frame()?.url().split('?')[0] ?? ''}`); });
+      context.on('requestfailed', r => trace.push(`${new Date().toISOString()} http FAILED ${r.failure()?.errorText} ${r.method()} ${r.url().split('?')[0]}`));
       context.on('console', msg => trace.push(`${new Date().toISOString()} ${sourceOf(msg.location().url || '')} ${msg.type()} ${msg.text()}`));
       context.on('close', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
       process.on('exit', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
     }
     context.on('weberror', e => keep(sourceOf(e.page()?.url() || ''), String(e.error())));
+    context.on("request", async r => { if (!r.url().includes("/ws/mgw")) return; const h = await r.allHeaders().catch(() => ({})); const cookie = (h.cookie || "").split(";").map(c => c.split("=")[0].trim()).filter(Boolean).sort().join(","); if (process.env.THEMIS_E2E_WSHDR) console.log("WSHDR", JSON.stringify({ ...h, cookie }).slice(0, 1500)); });
     const page = await context.newPage();
     page.on('pageerror', e => keep('page', String(e)));
     // Start from an empty Themis store so chats from earlier runs don't load their frames too; the sites'
