@@ -5,6 +5,7 @@
 //   npx playwright-core install chromium   (once)
 //   npm run test:e2e:login   opens the 5 sites in the E2E profile, in Chromium without automation; sign in by hand, then close it
 //   npm run test:e2e         runs the check (THEMIS_E2E_SITES=chatgpt,gemini to pick sites)
+//   THEMIS_E2E_TRACE=1       also turns on Themis debug logging and writes every console line to trace.log
 //
 // Result per site: PASS (a real reply carrying that member's token reached the Themis UI), FAIL, or BLOCKED
 // (a bot check or a missing sign-in kept the prompt from being answered; see the screenshot).
@@ -23,9 +24,10 @@ const SITES = {
   grok: { url: 'https://grok.com/', host: 'grok.com' },
 };
 const root = path.join(__dirname, 'dist'); // the built extension (npm run build)
-const profile = process.env.THEMIS_E2E_PROFILE || path.join(root, 'test-results', 'e2e-profile');
-const out = path.join(root, 'test-results', 'e2e');
+const profile = process.env.THEMIS_E2E_PROFILE || path.join(__dirname, 'test-results', 'e2e-profile');
+const out = path.join(__dirname, 'test-results', 'e2e');
 const sites = (process.env.THEMIS_E2E_SITES || Object.keys(SITES).join(',')).split(',').map(s => s.trim()).filter(Boolean);
+const TRACE = process.env.THEMIS_E2E_TRACE === '1';
 const REPLY_TIMEOUT_MS = Number(process.env.THEMIS_E2E_TIMEOUT_MS || 240000);
 // DeepSeek's WAF leaves only "Please refresh the page to try again!" in automated browsers.
 const BOT_CHECK = /please refresh the page to try again|just a moment|verify you are human|checking your browser|performing security verification|403 error|request blocked|the request could not be satisfied|access denied/i;
@@ -88,6 +90,12 @@ async function run() {
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const extensionId = new URL(worker.url()).host;
     context.on('console', msg => { if (msg.type() === 'error') keep(sourceOf(msg.location().url || ''), msg.text()); });
+    const trace = [];
+    if (TRACE) {
+      await worker.evaluate(() => { globalThis.THEMIS_DEBUG = true; });
+      context.on('console', msg => trace.push(`${new Date().toISOString()} ${sourceOf(msg.location().url || '')} ${msg.type()} ${msg.text()}`));
+      context.on('close', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
+    }
     context.on('weberror', e => keep(sourceOf(e.page()?.url() || ''), String(e.error())));
     const page = await context.newPage();
     page.on('pageerror', e => keep('page', String(e)));
@@ -138,6 +146,12 @@ async function run() {
       const challenge = frame?.childFrames().some(f => f.url().includes('challenges.cloudflare.com'));
       m.preflight = { frameUrl: frame?.url() ?? null, botCheck: Boolean(challenge || BOT_CHECK.test(text)), signInPrompt: SIGN_IN.test(text) };
       m.status = (await page.locator('#role-list .role-card', { hasText: m.name }).locator('.status-pill').innerText().catch(() => '')).trim();
+    }
+
+    if (TRACE) {
+      // Themis logs only with debug on; the content script reads the flag from the site page's localStorage.
+      await page.evaluate(() => localStorage.setItem('themis:debug', 'true'));
+      for (const m of members) await (await frameOf(page, m))?.evaluate(() => localStorage.setItem('themis:debug', 'true')).catch(() => {});
     }
 
     const prompt = [
