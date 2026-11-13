@@ -210,7 +210,7 @@ async function run() {
     pending = new Set(members.filter(m => m.failedRound));
 
     await page.locator('#chat-list').getByText(`E2E ${stamp}`).first().click().catch(() => {}); // keep our chat in view
-    await page.screenshot({ path: path.join(out, 'team.png') });
+    await page.screenshot({ path: path.join(out, 'team.png'), timeout: 15000 }).catch(() => {}); // evidence only; never fail the run on it
     for (const m of members) {
       const frame = await frameOf(page, m);
       const text = await frameText(frame);

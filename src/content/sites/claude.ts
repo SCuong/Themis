@@ -15,7 +15,8 @@ const CLAUDE_SELECTORS = {
   editor: '[data-testid="chat-input"][contenteditable="true"], div[contenteditable="true"][aria-label*="Claude"]',
   sendButton:
     'button[aria-label*="Send"], button[aria-label*="发送"], button[aria-label*="Submit"], button[aria-label*="发送消息"]',
-  response: '.font-claude-response',
+  // .font-claude-response is the layout before late 2026; replies now sit in assistant-message rows.
+  response: '.font-claude-response, [data-testid="assistant-message"] [data-perf-reply-text]',
   copyButton:
     'button[data-testid="action-bar-copy"], [role="group"][aria-label="Message actions"] button[aria-label="Copy"], button[aria-label="Copy"], button[aria-label="复制"]',
   blocker: '[role="dialog"], .cookie-banner, [aria-label*="Cookie"], [aria-label*="Consent"]',
