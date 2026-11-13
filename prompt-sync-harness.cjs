@@ -2,6 +2,7 @@
 // drive the same onMessage router the extension uses and read the exact prompt
 // text handed to chrome.tabs.sendMessage.
 const { pathToFileURL } = require('node:url');
+require('fake-indexeddb/auto'); // spec-accurate IndexedDB for the image and file stores
 
 const SITE_URL = {
   gemini: id => `https://gemini.google.com/app/${id}`,
@@ -14,8 +15,9 @@ let instance = 0;
 // The service worker logs every step; keep test output readable.
 console.log = console.info = console.debug = console.warn = () => {};
 
-async function startThemis({ mode = 'collaborative', language = 'vi', roles, seed }) {
-  const memory = {};
+// Pass the memory of an earlier instance to restart the service worker on the same chrome.storage.
+async function startThemis({ mode = 'collaborative', language = 'vi', roles, seed, memory: restart }) {
+  const memory = restart ?? {};
   const prompts = [];
   // Every other message sent to a member frame, and an optional per-type responder for it.
   const frameMessages = [];
@@ -23,6 +25,11 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
   let listener;
   let failNextSend = 0;
   const event = { addListener() {} };
+  // Browser tabs and DNR session rules, for the per-tab frame rules.
+  const tabs = [];
+  let sessionRules = [];
+  const tabListeners = {};
+  const tabEvent = name => ({ addListener(fn) { (tabListeners[name] ??= []).push(fn); } });
   global.chrome = {
     storage: { local: {
       async get(keys) {
@@ -37,10 +44,16 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
       onInstalled: event, onStartup: event, sendMessage: async () => ({}),
       onMessage: { addListener(fn) { listener = fn; } },
     },
+    declarativeNetRequest: {
+      async updateSessionRules({ removeRuleIds = [], addRules = [] }) { sessionRules = [...sessionRules.filter(r => !removeRuleIds.includes(r.id)), ...structuredClone(addRules)]; },
+      async getSessionRules() { return structuredClone(sessionRules); },
+    },
     action: { onClicked: event },
     alarms: { create() {}, onAlarm: event },
     tabs: {
-      onRemoved: event, create: async () => ({}),
+      onRemoved: tabEvent('onRemoved'), onCreated: tabEvent('onCreated'), onUpdated: tabEvent('onUpdated'), onReplaced: tabEvent('onReplaced'),
+      create: async () => ({}),
+      async query() { return structuredClone(tabs); },
       async sendMessage(tabId, message, options) {
         if (message.type !== 'TEAM_SEND_PROMPT') { frameMessages.push({ ...message, frameId: options.frameId }); return frameResponders[message.type]?.(message) ?? { ok: true }; }
         if (failNextSend > 0) { failNextSend -= 1; throw new Error('Could not establish connection'); }
@@ -61,7 +74,7 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
     role.frameId = index + 1;
   });
   seed?.(store);
-  await shared.F(store);
+  if (!restart) await shared.F(store);
 
   instance += 1;
   await import(`${pathToFileURL(require.resolve('./background.js')).href}?instance=${instance}`);
@@ -83,6 +96,10 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles, see
   };
 
   const api = {
+    memory,
+    tabs,
+    async fireTab(name, ...args) { for (const fn of tabListeners[name] ?? []) fn(...args); await new Promise(r => setTimeout(r, 20)); },
+    sessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
     prompts,
     frameMessages,
     frameResponders,

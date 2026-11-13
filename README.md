@@ -76,7 +76,7 @@ Themis is a Manifest V3 Chrome extension. There is no backend.
 | Background service worker | `background.js` | Stores state, routes messages to members, runs orchestration, calls external API models (via the Vercel AI SDK) |
 | Content script | `content.js` | Runs inside each AI site's page: types the prompt, pastes attachments, presses send and reads the reply back |
 | Shared module | `assets/imageAttachmentRepository-*.js` | Store schema and migrations, personas, team templates and helpers used by the other parts |
-| Network rules | `themis-frame-rules.json` | Lets the AI sites load inside the workspace (see [Security and privacy](#security-and-privacy)) |
+| Network rules | `background.js` (session rules) | Lets the AI sites load inside workspace tabs only (see [Security and privacy](#security-and-privacy)) |
 
 For website members, Themis embeds each AI site in a frame inside the workspace and drives it with the content script, using your existing signed-in session. Each member gets its own frame and its own conversation, so several members can use the same site. For API members, the background worker calls the provider directly with the key you entered.
 
@@ -118,11 +118,13 @@ npm run test:live         # THEMIS_LIVE_SITES=chatgpt,claude limits the sites
 
 It uses a separate Chrome profile in `test-results/live-profile`, uses a little of each account's quota, and is not run in CI.
 
+**Frame rules in a real browser.** `npm run test:frames` loads Themis unpacked in Playwright's Chromium (branded Chrome ignores `--load-extension`; run `npx playwright-core install chromium` once) and checks that each AI site can be framed in a workspace tab, stays blocked in an ordinary tab, keeps working after a navigation inside the frame, and loses the exception when the workspace tab closes or navigates away. It needs network access but no sign-in. In an automated browser Claude and Grok show a Cloudflare check and DeepSeek a 403 page, so for those three it proves the frame is allowed, not that the app works.
+
 **Whole-extension E2E against the real sites.** `e2e.live.cjs` loads Themis unpacked in Playwright's Chromium, creates a group chat in `team.html` through the real UI, adds one member per site, sends one `@all` prompt asking each member for its own token, and checks that each token comes back under the right member:
 
 ```
 npx playwright-core install chromium   # once; branded Chrome ignores --load-extension
-npm run test:e2e:login                 # sign in to each site in the window that opens, then close it
+npm run test:e2e:login                 # sign in to each site in the window that opens (plain Chromium, no automation), then close it
 npm run test:e2e                       # THEMIS_E2E_SITES=chatgpt,gemini limits the sites
 ```
 
@@ -134,7 +136,7 @@ Each site is reported as PASS (a real reply reached the Themis UI), FAIL, or BLO
 - `prompt-sync-harness.cjs` loads the real `background.js` against a fake `chrome` API, so message routing can be tested without a browser.
 - `node preview-server.cjs 5173` serves the workspace page at `http://localhost:5173/team.html` for UI work, with sample data and no real AI sites.
 
-**Current results** (at the commit in this repository): `npm run check` passes, and `npm test` runs 63 tests. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
+**Current results** (at the commit in this repository): `npm run check` passes, and `npm test` runs 72 tests. One layout test (`ui-redesign.test.cjs`, "all workspaces and dialogs fit…") is intermittent: it sometimes times out when the whole suite runs in parallel, and passes when run on its own.
 
 ## Limitations
 
@@ -149,9 +151,9 @@ Each site is reported as PASS (a real reply reached the Themis UI), FAIL, or BLO
 ## Security and privacy
 
 - **No Themis server.** Prompts go from your browser to the AI sites you use, and to any API provider you configure. Themis does not send data anywhere else.
-- **Frame protection is relaxed for the AI sites.** To embed the AI sites, `themis-frame-rules.json` removes the `Content-Security-Policy` and `X-Frame-Options` response headers for those six sites, only when they load inside a frame opened by Themis itself (or navigate within such a frame). Other websites that try to frame the AI sites still get the sites' normal protection.
+- **Frame protection is relaxed only in workspace tabs.** To embed the AI sites, Themis removes their `Content-Security-Policy` and `X-Frame-Options` response headers for frames inside open Themis workspace tabs, using session rules limited to those tab IDs. The rule is updated as tabs open, close or navigate; any other tab, including other websites that try to frame the AI sites, keeps the sites' normal protection.
 - **Host permissions.** Access to any site other than the AI sites (and OpenAI's image hosts, for saving ChatGPT reply images) is optional: when you save or test an API model, Chrome asks for access to that model's host only. It also has clipboard permissions, used as a fallback for reading a reply from an AI site when the reply cannot be read from the page directly.
-- **Local storage.** Chats, personas and settings are stored in `chrome.storage.local`; attachments are stored in IndexedDB. **API keys for external models** are encrypted (AES-GCM) before they are stored, with a non-extractable key kept in the extension's IndexedDB, so a copy of `chrome.storage` does not reveal them. This is not a password vault: anyone who controls your Chrome profile can still run the extension and use the keys. Deleting a chat removes its messages, attachments, notes, highlights, model memories and workflows.
+- **Local storage.** Chats, personas and settings are stored in `chrome.storage.local`; attachments are stored in IndexedDB. **API keys for external models** are encrypted (AES-GCM) before they are stored, with a non-extractable key kept in the extension's IndexedDB, so a copy of `chrome.storage` does not reveal them. This is not a password vault: anyone who controls your Chrome profile can still run the extension and use the keys. Deleting a chat removes its messages, attachments, notes, highlights, model memories and workflows. Attachment deletes are recorded in a cleanup queue in the same write that deletes the chat; if IndexedDB fails, the task stays queued and is retried each time the extension starts.
 - **Your accounts, your data.** Messages and attachments you send to a member are sent to that member's AI provider and are subject to that provider's policies.
 
 ## License and credits

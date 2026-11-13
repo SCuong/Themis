@@ -11,10 +11,12 @@
     "test:live:login": "node providers.live.cjs --login",
     "test:e2e": "node e2e.live.cjs",
     "test:e2e:login": "node e2e.live.cjs --login",
-    "rebuild:upstream": "node scripts/rebuild-upstream.cjs"
+    "rebuild:upstream": "node scripts/rebuild-upstream.cjs",
+    "test:frames": "node --test --test-concurrency=1 frame-rules.browser.cjs"
   },
   "devDependencies": {
     "acorn": "^8.15.0",
+    "fake-indexeddb": "^6.2.8",
     "jsdom": "^26.1.0",
     "playwright-core": "^1.56.1"
   },
