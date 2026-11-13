@@ -124,6 +124,16 @@ It uses a separate Chrome profile in `test-results/live-profile`, uses a little 
 
 **Frame rules in a real browser.** `npm run test:frames` loads `dist/` unpacked in Playwright's Chromium (branded Chrome ignores `--load-extension`; run `npx playwright-core install chromium` once) and checks that each AI site can be framed in a workspace tab, stays blocked in an ordinary tab, keeps working after a navigation inside the frame, and loses the exception when the workspace tab closes or navigates away. It needs network access but no sign-in. In an automated browser Claude and Grok show a Cloudflare check and DeepSeek a 403 page, so for those three it proves the frame is allowed, not that the app works.
 
+**Whole-extension E2E against the real sites.** `e2e.live.cjs` loads `dist/` unpacked in Playwright's Chromium, creates a group chat in `team.html` through the real UI, adds one member per site, sends one `@all` prompt asking each member for its own token, and checks that each token comes back under the right member:
+
+```
+npx playwright-core install chromium   # once; branded Chrome ignores --load-extension
+npm run test:e2e:login                 # sign in to each site in the window that opens (plain Chromium, no automation), then close it
+npm run test:e2e                       # THEMIS_E2E_SITES=chatgpt,gemini limits the sites
+```
+
+Each site is reported as PASS (a real reply reached the Themis UI), FAIL, or BLOCKED (a bot check or a missing sign-in stopped it). `test-results/e2e/` gets `summary.json`, `summary.md`, `team.png`, one screenshot per site frame, and the console errors. It runs headed on its own profile (`test-results/e2e-profile`), clears Themis's stored chats (not the site sign-ins) at the start of each run, exits non-zero unless every site passes, and is not run in CI.
+
 **Comparing with upstream.** `npm run rebuild:upstream` builds OpenTeam v1.0.3 (commit `8ef6f37`) from its own repository into `test-results/upstream/dist` and lists which files of `dist/` are identical to it. Since `src/` started as that exact source (the first commit of the port builds byte-identical to the upstream release), `git log -p -- src` shows every change Themis made to it.
 
 - The browser UI tests drive Google Chrome through `playwright-core` and expect Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` (see `ui-fixture.cjs`). Change that path on macOS or Linux.

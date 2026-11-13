@@ -11,6 +11,8 @@
     "hashes": "node scripts/dist-hashes.cjs",
     "test:live": "node --test providers.live.cjs",
     "test:live:login": "node providers.live.cjs --login",
+    "test:e2e": "node e2e.live.cjs",
+    "test:e2e:login": "node e2e.live.cjs --login",
     "rebuild:upstream": "node scripts/rebuild-upstream.cjs",
     "test:frames": "node --test --test-concurrency=1 frame-rules.browser.cjs"
   },
