@@ -9,6 +9,8 @@
     "check": "node --check background.js && node --check content.js && node --check team.js && node --check assets/imageAttachmentRepository-DBrzc-g8.js && node --check team-ui.js && node --check profile-avatars.js && node --check localization.js",
     "test:live": "node --test providers.live.cjs",
     "test:live:login": "node providers.live.cjs --login",
+    "test:e2e": "node e2e.live.cjs",
+    "test:e2e:login": "node e2e.live.cjs --login",
     "rebuild:upstream": "node scripts/rebuild-upstream.cjs",
     "test:frames": "node --test --test-concurrency=1 frame-rules.browser.cjs"
   },
