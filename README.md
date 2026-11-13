@@ -124,7 +124,7 @@ It uses a separate Chrome profile in `test-results/live-profile`, uses a little 
 
 **Frame rules in a real browser.** `npm run test:frames` loads `dist/` unpacked in Playwright's Chromium (branded Chrome ignores `--load-extension`; run `npx playwright-core install chromium` once) and checks that each AI site can be framed in a workspace tab, stays blocked in an ordinary tab, keeps working after a navigation inside the frame, and loses the exception when the workspace tab closes or navigates away. It needs network access but no sign-in. In an automated browser Claude and Grok show a Cloudflare check and DeepSeek a 403 page, so for those three it proves the frame is allowed, not that the app works.
 
-**Whole-extension E2E against the real sites.** `e2e.live.cjs` loads `dist/` unpacked in Playwright's Chromium, creates a group chat in `team.html` through the real UI, adds one member per site, sends one `@all` prompt asking each member for its own token, and checks that each token comes back under the right member:
+**Whole-extension E2E against the real sites.** `e2e.live.cjs` starts Playwright's Chromium with `dist/` unpacked and attaches to it over the DevTools protocol (a browser launched by Playwright carries automation flags, and signed-in Gemini then never answers), creates a group chat in `team.html` through the real UI, adds one member per site, sends one `@all` prompt asking each member for its own token, and checks that each token comes back under the right member:
 
 ```
 npx playwright-core install chromium   # once; branded Chrome ignores --load-extension
