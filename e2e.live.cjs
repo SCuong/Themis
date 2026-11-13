@@ -39,10 +39,11 @@ const launch = () => chromium.launchPersistentContext(profile, {
 });
 
 // Starts the same Chromium binary on the same profile, but without Playwright: no automation flags or
-// DevTools pipe, so Google sign-in and Cloudflare treat it like an ordinary browser.
+// DevTools pipe, so Google sign-in and Cloudflare treat it like an ordinary browser. Themis stays loaded:
+// opening the profile without it makes Chrome mark the unpacked extension disabled for later runs too.
 async function login() {
   mkdirSync(profile, { recursive: true });
-  const browser = spawn(chromium.executablePath(), [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', ...Object.values(SITES).map(s => s.url)], { stdio: 'ignore' });
+  const browser = spawn(chromium.executablePath(), [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', `--disable-extensions-except=${root}`, `--load-extension=${root}`, ...Object.values(SITES).map(s => s.url)], { stdio: 'ignore' });
   console.log(`Sign in to each site in the browser window, then close it. Profile: ${profile}`);
   await new Promise((resolve, reject) => { browser.on('exit', resolve); browser.on('error', reject); });
 }
@@ -95,6 +96,12 @@ async function run() {
     await worker.evaluate(() => chrome.storage.local.clear());
     await page.goto(`chrome-extension://${extensionId}/team.html`);
     await page.locator('#quick-create-chat').waitFor();
+    // Without the per-tab frame rule every site refuses the iframe, which would read as five FAILs.
+    const ruleEnd = Date.now() + 10000;
+    while (!(await worker.evaluate(() => chrome.declarativeNetRequest.getSessionRules()).catch(() => [])).length) {
+      if (Date.now() > ruleEnd) throw new Error('Themis added no frame rule for the workspace tab; is the extension enabled in this profile?');
+      await page.waitForTimeout(250);
+    }
 
     // Group chat and members, through the same controls a user clicks.
     await page.locator('#quick-create-chat').click();
