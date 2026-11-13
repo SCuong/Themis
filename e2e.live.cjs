@@ -109,13 +109,21 @@ async function run() {
   const context = await launch();
   const result = { startedAt: new Date().toISOString(), stamp, profile, providers: [] };
   try {
-    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    // The extension's worker, not a site's (sites register service workers too).
+    const isThemis = w => w.url().startsWith('chrome-extension://');
+    const worker = context.serviceWorkers().find(isThemis) ?? await context.waitForEvent('serviceworker', { predicate: isThemis });
     const extensionId = new URL(worker.url()).host;
     context.on('console', msg => { if (msg.type() === 'error') keep(sourceOf(msg.location().url || ''), msg.text()); });
     const trace = [];
     if (TRACE) {
       await worker.evaluate(() => { globalThis.THEMIS_DEBUG = true; });
       context.on('response', r => { if (r.status() >= 400) trace.push(`${new Date().toISOString()} http ${r.status()} ${r.request().method()} ${r.url().split('?')[0]} | frame ${r.frame()?.url().split('?')[0] ?? ''}`); });
+      // Which cookies (names only) each site frame's page request carried: shows a frame that loads signed out.
+      context.on('request', async r => {
+        if (r.resourceType() !== 'document' || !r.frame()?.parentFrame()) return
+        const cookie = (await r.allHeaders().catch(() => ({}))).cookie || ''
+        trace.push(`${new Date().toISOString()} frame-document ${r.url().split('?')[0]} cookies: ${cookie.split(';').map(c => c.split('=')[0].trim()).filter(Boolean).sort().join(',') || '(none)'}`)
+      });
       context.on('requestfailed', r => trace.push(`${new Date().toISOString()} http FAILED ${r.failure()?.errorText} ${r.method()} ${r.url().split('?')[0]}`));
       context.on('console', msg => trace.push(`${new Date().toISOString()} ${sourceOf(msg.location().url || '')} ${msg.type()} ${msg.text()}`));
       context.on('close', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
