@@ -3,7 +3,7 @@
 // adds one member per site, sends one prompt and checks that each member's reply shows up under that member.
 //
 //   npx playwright-core install chromium   (once)
-//   npm run test:e2e:login   opens the 5 sites in the E2E profile; sign in to each by hand, then close the window
+//   npm run test:e2e:login   opens the 5 sites in the E2E profile, in Chromium without automation; sign in by hand, then close it
 //   npm run test:e2e         runs the check (THEMIS_E2E_SITES=chatgpt,gemini to pick sites)
 //
 // Result per site: PASS (a real reply carrying that member's token reached the Themis UI), FAIL, or BLOCKED
@@ -11,6 +11,7 @@
 // Summary, screenshots and console errors go to test-results/e2e/. Not part of `npm test` or CI: it needs
 // signed-in accounts and uses a little of each site's quota. Runs headed, since several sites refuse headless.
 const { mkdirSync, writeFileSync } = require('node:fs');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
 
@@ -37,11 +38,13 @@ const launch = () => chromium.launchPersistentContext(profile, {
   args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
 });
 
+// Starts the same Chromium binary on the same profile, but without Playwright: no automation flags or
+// DevTools pipe, so Google sign-in and Cloudflare treat it like an ordinary browser.
 async function login() {
-  const context = await launch();
-  for (const { url } of Object.values(SITES)) await (await context.newPage()).goto(url).catch(() => {});
+  mkdirSync(profile, { recursive: true });
+  const browser = spawn(chromium.executablePath(), [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', ...Object.values(SITES).map(s => s.url)], { stdio: 'ignore' });
   console.log(`Sign in to each site in the browser window, then close it. Profile: ${profile}`);
-  await new Promise(resolve => context.on('close', resolve));
+  await new Promise((resolve, reject) => { browser.on('exit', resolve); browser.on('error', reject); });
 }
 
 // Which bucket a console message belongs to: the service worker, a site frame, or the team page.
