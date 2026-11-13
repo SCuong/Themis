@@ -3,13 +3,15 @@
 ## Testing: you can drive the real extension in a browser
 
 Do not stop at the unit tests or ask the user to check by hand. This repo can load Themis unpacked in a
-real browser with Playwright and drive it end to end. Pick the cheapest test that proves your change:
+real browser with Playwright and drive it end to end. The extension is built from `src/` into `dist/`
+(`npm ci`, then `npm run build`); every test below except the source-level unit tests needs that build.
+Pick the cheapest test that proves your change:
 
 | Command | What it runs | Needs |
 |---|---|---|
-| `npm test` | Node tests: JSDOM fixtures for the site adapters (`provider-dom.test.cjs`), the real `background.js` against a fake `chrome` API (`prompt-sync-harness.cjs`), and the UI fixture (`ui-browser.test.cjs`) | Google Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` for the UI fixture (see `ui-fixture.cjs`) |
-| `npm run test:frames` | `frame-rules.browser.cjs`: loads Themis unpacked and checks the per-tab DNR rules that let the AI sites render in `team.html` iframes | Playwright Chromium, network, no sign-in |
-| `npm run test:live` | `providers.live.cjs`: runs the `content.js` site adapter directly on each real site page | Signed-in profile (`npm run test:live:login`) |
+| `npm test` | Node tests: JSDOM fixtures for the site adapters (`provider-dom.test.cjs`), the built `dist/background.js` against a fake `chrome` API (`prompt-sync-harness.cjs`), and the UI fixture (`ui-browser.test.cjs`) | Google Chrome at `C:/Program Files/Google/Chrome/Application/chrome.exe` for the UI fixture (see `ui-fixture.cjs`) |
+| `npm run test:frames` | `frame-rules.browser.cjs`: loads `dist/` unpacked and checks the per-tab DNR rules that let the AI sites render in `team.html` iframes | Playwright Chromium, network, no sign-in |
+| `npm run test:live` | `providers.live.cjs`: runs the content script's site adapters (from `src/content/sites/`) directly on each real site page | Signed-in profile (`npm run test:live:login`) |
 | `npm run test:e2e` | `e2e.live.cjs`: the whole extension. It creates a group chat in `team.html` through the UI, adds one member per site, sends one `@all` prompt and checks that each member's token comes back under that member. It writes `test-results/e2e/summary.{json,md}` plus screenshots | Signed-in profile (`npm run test:e2e:login`), headed |
 
 Only `npm test` runs in CI. The live tests use the user's real accounts and quota, so run them when your
@@ -17,8 +19,11 @@ change touches site adapters, prompt delivery or reply reading, and report what 
 
 ### How to load the extension in a browser
 
-- Use **Playwright's Chromium**, not Google Chrome: `npx playwright-core install chromium`, then
-  `chromium.launchPersistentContext(profileDir, { channel: 'chromium', args: ['--disable-extensions-except=<repo>', '--load-extension=<repo>'] })`.
+- Use **Playwright's Chromium**, not Google Chrome: `npx playwright-core install chromium`. For the real sites, start
+  that binary yourself (`--user-data-dir`, `--remote-debugging-port`, `--disable-extensions-except=<repo>/dist`,
+  `--load-extension=<repo>/dist`) and attach with `chromium.connectOverCDP(...)`, as `e2e.live.cjs` does. A browser
+  launched by Playwright carries automation flags (`navigator.webdriver`), and signed-in Gemini then accepts a prompt
+  but never answers. `launchPersistentContext` is fine for tests that do not need a site to reply (`test:frames`).
   Branded Chrome ignores `--load-extension`.
 - The service worker is `context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker')`. The extension id
   is `new URL(worker.url()).host` (it is fixed at `cnccbifloajlkjglmiojkpimjciamlpe` by the manifest `key`). Open
@@ -36,7 +41,8 @@ change touches site adapters, prompt delivery or reply reading, and report what 
 - Always pass `--load-extension` when you open that profile. If it is opened once without the extension, Chrome marks
   the unpacked extension disabled (`disable_reasons` in `Default/Preferences`). Every iframe is then refused, and
   `test:e2e` stops with "Themis added no frame rule".
-- Even when signed in, Claude and Grok show a Cloudflare check in automated Chromium. Report them as BLOCKED with
+- With the automation flags gone (the CDP attach above), Claude and Grok load signed in. If a site still shows a
+  Cloudflare check, report it as BLOCKED with
   the screenshot, never as PASS. ChatGPT, DeepSeek and Gemini work when signed in.
 - `test-results/` is gitignored and holds live session cookies and private chat text. Never commit it or paste
   from it.

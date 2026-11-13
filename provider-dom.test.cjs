@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { test } = require('node:test');
 const { JSDOM } = require('jsdom');
+const { sourceScript } = require('./test-support/source.cjs');
+
+const contentScript = sourceScript('test-support/content.ts', 'themisContent');
 
 function createAdapter(host, html, name) {
   const dom = new JSDOM(html, {
@@ -9,11 +12,8 @@ function createAdapter(host, html, name) {
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });
-  const source = readFileSync(require.resolve('./content.js'), 'utf8');
-  const end = source.indexOf('var Tt="__THEMIS_LOADED__"');
-  assert.ok(end > 0);
-  // Execute production adapter functions, stopping before extension boot and runtime messaging.
-  dom.window.eval(source.slice(0, end) + 'window.adapters={chatgpt:Qe,gemini:pt,deepseek:it};window.collectReply=le;})();');
+  // The real adapter modules, without the content script's boot and runtime messaging.
+  dom.window.eval(contentScript + ';window.adapters={chatgpt:themisContent.createChatGptAdapter,claude:themisContent.createClaudeAdapter,grok:themisContent.createGrokAdapter,gemini:themisContent.createGeminiAdapter,deepseek:themisContent.createDeepSeekAdapter};window.collectReply=themisContent.resolveReportableReplyText;');
   return { dom, adapter: dom.window.adapters[name]({ inputTimeoutMs: 800 }) };
 }
 
@@ -109,5 +109,41 @@ test('ChatGPT still reads the legacy response DOM', () => {
   `, 'chatgpt');
   try {
     assert.deepEqual(Array.from(adapter.getAllAssistantReplies()), ['Legacy reply.']);
+  } finally { dom.window.close(); }
+});
+
+test('Claude reads replies from its current assistant-message rows and ignores the user turn', () => {
+  // Markup as claude.ai renders it since late 2026 (trimmed): no .font-claude-response any more.
+  const { dom, adapter } = createAdapter('claude.ai', `
+    <div data-testid="transcript-row"><div data-testid="user-message"><p>Reply with exactly: TOKEN</p></div></div>
+    <div data-testid="transcript-row">
+      <div data-testid="assistant-message" data-cds="AssistantMessage">
+        <div class="contents" data-transcript-engine-root="">
+          <div class="prose" data-cds="Prose">
+            <div class="standard-markdown" data-perf-reply-text=""><p>CLAUDE-TOKEN-1</p></div>
+          </div>
+        </div>
+        <div role="group" aria-label="Message actions"><button aria-label="Copy">Copy</button><button aria-label="Retry">Retry</button></div>
+      </div>
+    </div>
+  `, 'claude');
+  try {
+    assert.deepEqual(Array.from(adapter.getAllAssistantReplies()), ['CLAUDE-TOKEN-1']);
+  } finally { dom.window.close(); }
+});
+
+test('Claude still reads the earlier .font-claude-response layout', () => {
+  const { dom, adapter } = createAdapter('claude.ai', '<div class="font-claude-response"><p>Older layout reply.</p></div>', 'claude');
+  try {
+    assert.deepEqual(Array.from(adapter.getAllAssistantReplies()), ['Older layout reply.']);
+  } finally { dom.window.close(); }
+});
+
+test('Grok keeps waiting while its reply bubble only shows a connection status', () => {
+  const { dom, adapter } = createAdapter('grok.com', '<div data-testid="assistant-message"><span>Reconnecting…</span></div>', 'grok');
+  try {
+    assert.equal(adapter.isGenerating(), true);
+    dom.window.document.querySelector('[data-testid="assistant-message"]').innerHTML = '<p>THEMIS-GROK-TOKEN</p>';
+    assert.equal(adapter.isGenerating(), false);
   } finally { dom.window.close(); }
 });

@@ -1,26 +1,15 @@
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
-const { runInNewContext } = require('node:vm');
 const { test } = require('node:test');
+const { importSource } = require('./test-support/source.cjs');
 
-test('frame assignment starts on mount, retries before load, and stops on readiness', () => {
-  const source = readFileSync(require.resolve('./team.js'), 'utf8');
-  const start = source.indexOf('class Za{');
-  const end = source.indexOf('function Ya(', start);
-  assert.ok(start > 0 && end > start);
+test('frame assignment starts on mount, retries before load, and stops on readiness', async () => {
+  const { IframeHost } = await importSource('test-support/team.ts');
   const timers = new Map();
   const posts = [];
   const clock = {
     setInterval(callback) { const key = Symbol(); timers.set(key, callback); return key; },
     clearInterval(key) { timers.delete(key); },
   };
-  const IframeHost = runInNewContext(source.slice(start, end) + ';Za', {
-    Ae(object, key, value) { object[key] = value; },
-    Va: 1000, Wa: 'THEMIS_ASSIGN_FRAME_ROLE',
-    Te: (chat, role) => chat + ':' + role,
-    na: url => new URL(url).origin,
-    Date,
-  });
   const host = new IframeHost({
     visibleHost: { dataset: {}, ownerDocument: {} },
     window: clock,

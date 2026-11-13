@@ -134,7 +134,8 @@ test('one sidebar holds navigation, chats and settings; collapses on wide window
 
     await page.setViewportSize({ width: 375, height: 812 });
     assert.equal(await page.locator('#collapse-sidebar').isVisible(), false);
-    assert.equal(await sidebar.evaluate(el => el.inert), true);
+    // team-ui.js applies the narrow layout from a resize listener, so wait for it instead of reading it once.
+    await sidebar.evaluate(el => new Promise(resolve => { const check = () => (el.inert ? resolve() : requestAnimationFrame(check)); check(); }));
     await page.locator('#toggle-chat-sidebar').click();
     await page.locator('#settings-button').waitFor();
     const box = await sidebar.boundingBox();

@@ -24,7 +24,7 @@ test('all workspaces and dialogs fit desktop and narrow Chrome viewports in both
   for (const [width, theme] of viewports) {
     const { browser, page, errors } = await openFixture({
       viewport: { width, height: { 375: 812, 960: 680, 1440: 960 }[width] },
-      root: baseline ? path.join(__dirname, 'test-results/baseline') : __dirname,
+      root: baseline ? path.join(__dirname, 'test-results/baseline') : path.join(__dirname, 'dist'),
       prepare(seed) {
         seed.settings.externalModelOrder = ['fixture'];
         seed.settings.externalModelsById.fixture = {

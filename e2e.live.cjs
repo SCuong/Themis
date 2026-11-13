@@ -5,12 +5,15 @@
 //   npx playwright-core install chromium   (once)
 //   npm run test:e2e:login   opens the 5 sites in the E2E profile, in Chromium without automation; sign in by hand, then close it
 //   npm run test:e2e         runs the check (THEMIS_E2E_SITES=chatgpt,gemini to pick sites)
+//   THEMIS_E2E_TRACE=1       also turns on Themis debug logging and writes every console line to trace.log
+//   THEMIS_E2E_ROUNDS=n      sends n messages in the same chat; later rounds exercise prompt sync (persona not resent)
+//   THEMIS_E2E_EXTENSION=dir loads that unpacked extension instead of dist/ (for example test-results/upstream/dist)
 //
 // Result per site: PASS (a real reply carrying that member's token reached the Themis UI), FAIL, or BLOCKED
 // (a bot check or a missing sign-in kept the prompt from being answered; see the screenshot).
 // Summary, screenshots and console errors go to test-results/e2e/. Not part of `npm test` or CI: it needs
 // signed-in accounts and uses a little of each site's quota. Runs headed, since several sites refuse headless.
-const { mkdirSync, writeFileSync } = require('node:fs');
+const { mkdirSync, rmSync, writeFileSync } = require('node:fs');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
@@ -22,21 +25,42 @@ const SITES = {
   deepseek: { url: 'https://chat.deepseek.com/', host: 'chat.deepseek.com' },
   grok: { url: 'https://grok.com/', host: 'grok.com' },
 };
-const root = __dirname;
-const profile = process.env.THEMIS_E2E_PROFILE || path.join(root, 'test-results', 'e2e-profile');
-const out = path.join(root, 'test-results', 'e2e');
+// The built extension (npm run build). THEMIS_E2E_EXTENSION loads another unpacked build instead, e.g. the
+// original OpenTeam release from npm run rebuild:upstream, to compare a site against it.
+const root = process.env.THEMIS_E2E_EXTENSION ? path.resolve(process.env.THEMIS_E2E_EXTENSION) : path.join(__dirname, 'dist');
+const profile = process.env.THEMIS_E2E_PROFILE || path.join(__dirname, 'test-results', 'e2e-profile');
+const out = path.join(__dirname, 'test-results', 'e2e');
 const sites = (process.env.THEMIS_E2E_SITES || Object.keys(SITES).join(',')).split(',').map(s => s.trim()).filter(Boolean);
+const TRACE = process.env.THEMIS_E2E_TRACE === '1';
+const ROUNDS = Math.max(1, Number(process.env.THEMIS_E2E_ROUNDS || 1));
 const REPLY_TIMEOUT_MS = Number(process.env.THEMIS_E2E_TIMEOUT_MS || 240000);
 // DeepSeek's WAF leaves only "Please refresh the page to try again!" in automated browsers.
 const BOT_CHECK = /please refresh the page to try again|just a moment|verify you are human|checking your browser|performing security verification|403 error|request blocked|the request could not be satisfied|access denied/i;
 const SIGN_IN = /\b(log ?in|sign ?in|sign ?up|continue with google)\b/i;
 
-const launch = () => chromium.launchPersistentContext(profile, {
-  channel: 'chromium',
-  headless: process.env.THEMIS_E2E_HEADLESS === '1',
-  viewport: { width: 1440, height: 900 },
-  args: [`--disable-extensions-except=${root}`, `--load-extension=${root}`],
-});
+// Chromium is started like an ordinary browser and Playwright attaches over the DevTools protocol. Launched by
+// Playwright itself it carries automation flags (navigator.webdriver), and signed-in Gemini then accepts the
+// prompt but never answers.
+const CDP_PORT = Number(process.env.THEMIS_E2E_CDP_PORT || 9333);
+async function launch() {
+  // Chrome keeps a registered extension service worker across runs and can keep running an older
+  // background.js than the one in dist/. Dropping the cache makes every run test the current build.
+  rmSync(path.join(profile, 'Default', 'Service Worker'), { recursive: true, force: true });
+  const browser = spawn(chromium.executablePath(), [
+    `--user-data-dir=${profile}`, `--remote-debugging-port=${CDP_PORT}`, '--no-first-run', '--no-default-browser-check',
+    '--window-size=1440,900', ...(process.env.THEMIS_E2E_HEADLESS === '1' ? ['--headless=new'] : []),
+    `--disable-extensions-except=${root}`, `--load-extension=${root}`, 'about:blank',
+  ], { stdio: 'ignore' });
+  let cdp;
+  for (let i = 0; i < 60 && !cdp; i++) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    cdp = await chromium.connectOverCDP(`http://127.0.0.1:${CDP_PORT}`).catch(() => undefined);
+  }
+  if (!cdp) { browser.kill(); throw new Error(`Chromium did not open its debugging port ${CDP_PORT}`); }
+  const context = cdp.contexts()[0];
+  context.shutdown = async () => { await cdp.close().catch(() => {}); browser.kill(); };
+  return context;
+}
 
 // Starts the same Chromium binary on the same profile, but without Playwright: no automation flags or
 // DevTools pipe, so Google sign-in and Cloudflare treat it like an ordinary browser. Themis stays loaded:
@@ -85,10 +109,28 @@ async function run() {
   const context = await launch();
   const result = { startedAt: new Date().toISOString(), stamp, profile, providers: [] };
   try {
-    const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+    // The extension's worker, not a site's (sites register service workers too).
+    const isThemis = w => w.url().startsWith('chrome-extension://');
+    const worker = context.serviceWorkers().find(isThemis) ?? await context.waitForEvent('serviceworker', { predicate: isThemis });
     const extensionId = new URL(worker.url()).host;
     context.on('console', msg => { if (msg.type() === 'error') keep(sourceOf(msg.location().url || ''), msg.text()); });
+    const trace = [];
+    if (TRACE) {
+      await worker.evaluate(() => { globalThis.THEMIS_DEBUG = true; });
+      context.on('response', r => { if (r.status() >= 400) trace.push(`${new Date().toISOString()} http ${r.status()} ${r.request().method()} ${r.url().split('?')[0]} | frame ${r.frame()?.url().split('?')[0] ?? ''}`); });
+      // Which cookies (names only) each site frame's page request carried: shows a frame that loads signed out.
+      context.on('request', async r => {
+        if (r.resourceType() !== 'document' || !r.frame()?.parentFrame()) return
+        const cookie = (await r.allHeaders().catch(() => ({}))).cookie || ''
+        trace.push(`${new Date().toISOString()} frame-document ${r.url().split('?')[0]} cookies: ${cookie.split(';').map(c => c.split('=')[0].trim()).filter(Boolean).sort().join(',') || '(none)'}`)
+      });
+      context.on('requestfailed', r => trace.push(`${new Date().toISOString()} http FAILED ${r.failure()?.errorText} ${r.method()} ${r.url().split('?')[0]}`));
+      context.on('console', msg => trace.push(`${new Date().toISOString()} ${sourceOf(msg.location().url || '')} ${msg.type()} ${msg.text()}`));
+      context.on('close', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
+      process.on('exit', () => writeFileSync(path.join(out, 'trace.log'), trace.join('\n')));
+    }
     context.on('weberror', e => keep(sourceOf(e.page()?.url() || ''), String(e.error())));
+    context.on("request", async r => { if (!r.url().includes("/ws/mgw")) return; const h = await r.allHeaders().catch(() => ({})); const cookie = (h.cookie || "").split(";").map(c => c.split("=")[0].trim()).filter(Boolean).sort().join(","); if (process.env.THEMIS_E2E_WSHDR) console.log("WSHDR", JSON.stringify({ ...h, cookie }).slice(0, 1500)); });
     const page = await context.newPage();
     page.on('pageerror', e => keep('page', String(e)));
     // Start from an empty Themis store so chats from earlier runs don't load their frames too; the sites'
@@ -98,7 +140,9 @@ async function run() {
     await page.locator('#quick-create-chat').waitFor();
     // Without the per-tab frame rule every site refuses the iframe, which would read as five FAILs.
     const ruleEnd = Date.now() + 10000;
-    while (!(await worker.evaluate(() => chrome.declarativeNetRequest.getSessionRules()).catch(() => [])).length) {
+    // OpenTeam itself declares static rules in its manifest instead of per-tab session rules.
+    const staticRules = await worker.evaluate(() => Boolean(chrome.runtime.getManifest().declarative_net_request));
+    while (!staticRules && !(await worker.evaluate(() => chrome.declarativeNetRequest.getSessionRules()).catch(() => [])).length) {
       if (Date.now() > ruleEnd) throw new Error('Themis added no frame rule for the workspace tab; is the extension enabled in this profile?');
       await page.waitForTimeout(250);
     }
@@ -140,30 +184,47 @@ async function run() {
       m.status = (await page.locator('#role-list .role-card', { hasText: m.name }).locator('.status-pill').innerText().catch(() => '')).trim();
     }
 
-    const prompt = [
-      `@all Themis end-to-end test ${stamp}.`,
-      'Every member: reply with ONLY your own token from this list, nothing else.',
-      ...members.map(m => `${m.name}: ${m.token}`),
-    ].join('\n');
-    await page.locator('#message-input').fill(prompt);
-    const targets = (await page.locator('#target-preview').innerText().catch(() => '')).trim();
-    const sentAt = Date.now();
-    await page.locator('#send-message').click();
-
-    // Wait for every member's reply row; a row counts only if it is under that member and carries its token.
-    const pending = new Set(members);
-    const deadline = sentAt + REPLY_TIMEOUT_MS;
-    while (pending.size && Date.now() < deadline) {
-      for (const m of [...pending]) {
-        const row = page.locator('.message-row').filter({ has: page.locator('.message-name-text', { hasText: m.name }) }).filter({ hasText: m.token });
-        if (await row.count()) { m.responseMs = Date.now() - sentAt; m.uiReply = (await row.last().innerText()).slice(0, 500); pending.delete(m); }
-        if (!m.promptReached) m.promptReached = (await frameText(await frameOf(page, m))).includes(stamp);
-      }
-      if (pending.size) await page.waitForTimeout(2000);
+    if (TRACE) {
+      // Themis logs only with debug on; the content script reads the flag from the site page's localStorage.
+      await page.evaluate(() => localStorage.setItem('themis:debug', 'true'));
+      for (const m of members) await (await frameOf(page, m))?.evaluate(() => localStorage.setItem('themis:debug', 'true')).catch(() => {});
     }
 
+    let targets = '';
+    let pending;
+    // Each round is a new message in the same chat with fresh tokens. A member that misses a round stays failed.
+    for (let round = 1; round <= ROUNDS && members.some(m => !m.failedRound); round++) {
+      const live = members.filter(m => !m.failedRound);
+      if (round > 1) for (const m of live) { m.token = `${m.baseToken}-R${round}`; delete m.uiReply; delete m.responseMs; }
+      for (const m of live) m.baseToken ??= m.token;
+      const prompt = [
+        `@all Themis end-to-end test ${stamp}${round > 1 ? ` round ${round}` : ''}.`,
+        'Every member: reply with ONLY your own token from this list, nothing else.',
+        ...live.map(m => `${m.name}: ${m.token}`),
+      ].join('\n');
+      await page.locator('#message-input').fill(prompt);
+      targets ||= (await page.locator('#target-preview').innerText().catch(() => '')).trim();
+      const sentAt = Date.now();
+      await page.locator('#send-message').click();
+
+      // Wait for every member's reply row; a row counts only if it is under that member and carries its token.
+      pending = new Set(live);
+      const deadline = sentAt + REPLY_TIMEOUT_MS;
+      while (pending.size && Date.now() < deadline) {
+        for (const m of [...pending]) {
+          const row = page.locator('.message-row').filter({ has: page.locator('.message-name-text', { hasText: m.name }) }).filter({ hasText: m.token });
+          if (await row.count()) { m.responseMs = Date.now() - sentAt; m.uiReply = (await row.last().innerText()).slice(0, 500); pending.delete(m); }
+          if (!m.promptReached) m.promptReached = (await frameText(await frameOf(page, m))).includes(stamp);
+        }
+        if (pending.size) await page.waitForTimeout(2000);
+      }
+      for (const m of pending) m.failedRound = round;
+      if (ROUNDS > 1) console.log(`round ${round}: ${live.map(m => `${m.site} ${pending.has(m) ? 'FAIL' : `ok ${(m.responseMs / 1000).toFixed(1)}s`}`).join(', ')}`);
+    }
+    pending = new Set(members.filter(m => m.failedRound));
+
     await page.locator('#chat-list').getByText(`E2E ${stamp}`).first().click().catch(() => {}); // keep our chat in view
-    await page.screenshot({ path: path.join(out, 'team.png') });
+    await page.screenshot({ path: path.join(out, 'team.png'), timeout: 15000 }).catch(() => {}); // evidence only; never fail the run on it
     for (const m of members) {
       const frame = await frameOf(page, m);
       const text = await frameText(frame);
@@ -201,7 +262,7 @@ async function run() {
   } finally {
     result.finishedAt = new Date().toISOString();
     result.consoleErrors = { page: errors.page, serviceWorker: errors.serviceWorker };
-    await context.close().catch(() => {});
+    await context.shutdown();
   }
 
   writeFileSync(path.join(out, 'summary.json'), JSON.stringify(result, null, 2));

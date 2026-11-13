@@ -2,11 +2,12 @@ const { readFile, mkdir } = require('node:fs/promises');
 const { readFileSync, existsSync: fsExists } = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright-core');
+const { importSource } = require('./test-support/source.cjs');
 
 
 async function buildSeed(options = {}) {
-  const api = await import(require('node:url').pathToFileURL(require.resolve('./assets/imageAttachmentRepository-DBrzc-g8.js')).href);
-  const seed = api.C();
+  const api = await importSource('test-support/shared.ts');
+  const seed = api.createDefaultStore();
   const now = new Date('2026-11-11T03:00:00Z').getTime();
   seed.settings.language = options.language ?? 'en';
   seed.currentChatId = 'chat';
@@ -94,7 +95,7 @@ async function openFixture(options = {}) {
   const page = await browser.newPage({ viewport: options.viewport || { width: 1440, height: 960 }, reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  const root = options.root || __dirname;
+  const root = options.root || path.join(__dirname, 'dist');
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== 'themis.test') return route.fulfill({ body: '<!doctype html><title>Provider fixture</title>', contentType: 'text/html' });

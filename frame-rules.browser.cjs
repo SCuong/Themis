@@ -18,8 +18,8 @@ const SITES = {
   grok: 'https://grok.com/',
 };
 const OUTSIDE = 'https://frame-test.example/'; // a stand-in for any ordinary website, served locally
-const root = __dirname;
-const shots = path.join(root, 'test-results', 'frames');
+const root = path.join(__dirname, 'dist'); // the built extension (npm run build)
+const shots = path.join(__dirname, 'test-results', 'frames');
 let context, worker, profile, extensionId;
 
 before(async () => {
