@@ -199,6 +199,8 @@ export interface OrchestrationStageRun {
   reviewResults?: OrchestrationReviewResult[]
   startedAt?: number
   completedAt?: number
+  /** Set when Stop cut this node short, so Resume runs it again. */
+  interrupted?: boolean
 }
 
 export interface OrchestrationRun {
