@@ -101,6 +101,17 @@ test('Gemini remains generating while its Vietnamese stop button is enabled', ()
   } finally { dom.window.close(); }
 });
 
+test('Gemini ignores hidden stop buttons and words that only contain "stop"', () => {
+  const { dom, adapter } = createAdapter('gemini.google.com', `
+    <button aria-label="Dừng phản hồi" style="display:none"></button>
+    <button aria-label="Stop response" hidden></button>
+    <button>Gemini for Desktop</button>
+  `, 'gemini');
+  try {
+    assert.equal(adapter.isGenerating(), false);
+  } finally { dom.window.close(); }
+});
+
 test('ChatGPT still reads the legacy response DOM', () => {
   const { dom, adapter } = createAdapter('chatgpt.com', `
     <section data-turn="assistant" data-testid="conversation-turn-2">
@@ -109,5 +120,17 @@ test('ChatGPT still reads the legacy response DOM', () => {
   `, 'chatgpt');
   try {
     assert.deepEqual(Array.from(adapter.getAllAssistantReplies()), ['Legacy reply.']);
+  } finally { dom.window.close(); }
+});
+
+test('ChatGPT agent turns read the final answer, not the opening status line', () => {
+  const { dom, adapter } = createAdapter('chatgpt.com', `
+    <section data-turn="assistant" data-testid="conversation-turn-2">
+      <div data-message-author-role="assistant" data-turn-start-message="true" data-message-id="a"><p>Checked tooling and cloned repository</p></div>
+      <div data-message-author-role="assistant" data-message-id="b"><p>Kết luận: 2/5</p></div>
+    </section>
+  `, 'chatgpt');
+  try {
+    assert.deepEqual([...adapter.getAllAssistantReplies()], ['Kết luận: 2/5']);
   } finally { dom.window.close(); }
 });

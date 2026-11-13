@@ -124,7 +124,7 @@ async function startThemis({ mode = 'collaborative', language = 'vi', roles }) {
       return prompts.slice(before).find(prompt => prompt.roleId === roleId);
     },
   };
-  for (const role of roles) await api.frameReady(role.id, role.conversationId);
+  for (const role of roles) if (!role.notReady) await api.frameReady(role.id, role.conversationId);
   return api;
 }
 

@@ -137,3 +137,12 @@ test('Grok deletes the conversation by id', async () => {
   const { calls } = await deleteOnSite('grok.com', 'grok', 'b2c3d4e5-1111', { responses: {} });
   assert.deepEqual(calls.map(c => [c.method, c.url]), [['DELETE', 'https://grok.com/rest/app-chat/conversations/b2c3d4e5-1111']]);
 });
+
+test('remote delete waits for a member frame that is still loading', async () => {
+  // The conversation id is stored from an earlier session; the frame reports ready only after the delete starts.
+  const team = await startThemis({ roles: [{ id: 'gpt', name: 'Engineer', chatSite: 'chatgpt', geminiConversationId: 'gpt-conversation-1', notReady: true }] });
+  const pending = team.send({ type: 'GROUP_CHAT_DELETE', chatId: 'chat', deleteRemote: true });
+  setTimeout(() => team.frameReady('gpt', 'gpt-conversation-1'), 800);
+  const response = await pending;
+  assert.deepEqual(response.remoteDeletes.map(r => [r.site, r.ok, r.error]), [['chatgpt', true, undefined]]);
+});
