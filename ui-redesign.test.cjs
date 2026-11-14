@@ -245,6 +245,8 @@ test('chat feedback, theme contrast and touch targets work at extreme widths', {
             ['--warning', '--warning-bg'], ['--danger', '--danger-bg'],
           ].map(([a, b]) => contrast(a, b))),
           width: document.querySelector('.app-shell').scrollWidth,
+          coarse: matchMedia('(pointer: coarse)').matches,
+          control: style.getPropertyValue('--control-height').trim(),
           targets: [...document.querySelectorAll('.rail-btn, #attach-file, #send-message, #toggle-chat-sidebar')]
             .filter(el => el.checkVisibility())
             .map(el => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height)),
@@ -252,7 +254,9 @@ test('chat feedback, theme contrast and touch targets work at extreme widths', {
       });
       assert.ok(metrics.ratio >= 4.5, `${theme} text token contrast: ${metrics.ratio}`);
       assert.ok(metrics.width <= width, `app fits ${width}px`);
-      assert.ok(metrics.targets.every(size => size >= 44), `main targets fit ${width}px`);
+      // Target size follows the pointer, not the window width: 32px with a mouse at every width, 44px on touch (PRODUCT.md).
+      assert.ok(metrics.targets.every(size => size >= (metrics.coarse ? 44 : 32)), `main targets fit ${width}px`);
+      assert.equal(metrics.control, metrics.coarse ? '44px' : '32px', `control size does not depend on the ${width}px width`);
       await page.mouse.move(1, 1);
       await page.screenshot({ path: path.join(output, `${width}-${theme}-chat.png`) });
     }

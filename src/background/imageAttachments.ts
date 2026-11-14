@@ -50,25 +50,11 @@ export function createImageAttachmentService(deps: {
         }
 
         try {
-          const sourceUrl = requireSafeChatGptImageUrl(image.sourceUrl)
-          const response = await deps.fetchImage(sourceUrl, {
-            method: 'GET',
-            credentials: 'include',
-            redirect: 'follow',
-            cache: 'no-store',
-          })
-          if (!response.ok) throw new Error(`Image download failed (HTTP ${response.status})`)
-          if (response.url) requireSafeOpenAiImageUrl(response.url)
-
-          const mimeType = normalizeImageMimeType(response.headers.get('content-type'))
-          if (!mimeType) throw new Error('Remote content is not an image')
-          const declaredSize = readContentLength(response.headers.get('content-length'))
-          if (declaredSize !== undefined && declaredSize > maxImageBytes) throw new Error('Image exceeds the 25 MB limit')
-
-          const blob = await response.blob()
+          // Bytes read inside the site page (blob: sources), or a ChatGPT https source downloaded here.
+          const { blob, mimeType } = image.dataUrl ? decodeImageDataUrl(image.dataUrl) : await downloadSiteImage(image.sourceUrl)
           if (blob.size > maxImageBytes) throw new Error('Image exceeds the 25 MB limit')
           const normalizedBlob = blob.type === mimeType ? blob : blob.slice(0, blob.size, mimeType)
-          const fileName = `chatgpt-image-${index + 1}.${extensionForMimeType(mimeType)}`
+          const fileName = `${image.dataUrl ? 'reply' : imageDownloadSite(image.sourceUrl)}-image-${index + 1}.${extensionForMimeType(mimeType)}`
           const record: ImageAttachmentBlobRecord = {
             id,
             chatId: input.chatId,
@@ -101,6 +87,35 @@ export function createImageAttachmentService(deps: {
       return deps.repository.deleteByIds(ids)
     },
   }
+
+  async function downloadSiteImage(value: string): Promise<{ blob: Blob; mimeType: string }> {
+    const sourceUrl = requireDownloadableImageUrl(value)
+    const response = await deps.fetchImage(sourceUrl, {
+      method: 'GET',
+      credentials: 'include',
+      redirect: 'follow',
+      cache: 'no-store',
+    })
+    if (!response.ok) throw new Error(`Image download failed (HTTP ${response.status})`)
+    if (response.url) requireSafeRedirect(sourceUrl, response.url)
+
+    const mimeType = normalizeImageMimeType(response.headers.get('content-type'))
+    if (!mimeType) throw new Error('Remote content is not an image')
+    const declaredSize = readContentLength(response.headers.get('content-length'))
+    if (declaredSize !== undefined && declaredSize > maxImageBytes) throw new Error('Image exceeds the 25 MB limit')
+    return { blob: await response.blob(), mimeType }
+  }
+}
+
+// A data URL from the site page is untrusted input: only the raster types in SAFE_IMAGE_MIME_TYPES (no SVG), base64.
+function decodeImageDataUrl(value: string): { blob: Blob; mimeType: string } {
+  const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(value)
+  const mimeType = normalizeImageMimeType(match?.[1] ?? null)
+  if (!match || !mimeType) throw new Error('Remote content is not an image')
+  const binary = atob(match[2])
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return { blob: new Blob([bytes], { type: mimeType }), mimeType }
 }
 
 function deduplicateImages(images: ReplyImageSource[]): ReplyImageSource[] {
@@ -111,6 +126,7 @@ function deduplicateImages(images: ReplyImageSource[]): ReplyImageSource[] {
     const current = byUrl.get(sourceUrl)
     byUrl.set(sourceUrl, {
       sourceUrl,
+      dataUrl: current?.dataUrl ?? image.dataUrl,
       alt: current?.alt ?? image.alt,
       width: current?.width ?? image.width,
       height: current?.height ?? image.height,
@@ -119,16 +135,26 @@ function deduplicateImages(images: ReplyImageSource[]): ReplyImageSource[] {
   return [...byUrl.values()]
 }
 
-function requireSafeChatGptImageUrl(value: string): string {
+// Which member site may have this image URL downloaded (with the browser's cookies): ChatGPT for its own pages, Gemini
+// for Google's user-content CDN (its chart images, which its page cannot read: no CORS).
+export function imageDownloadSite(value: string): 'chatgpt' | 'gemini' | undefined {
   const url = parseHttpsUrl(value)
-  if (!url || !CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) throw new Error('Unsupported image source')
-  return url.href
+  if (!url) return undefined
+  if (CHATGPT_IMAGE_SOURCE_HOSTS.has(url.hostname)) return 'chatgpt'
+  if (url.hostname.endsWith('.googleusercontent.com')) return 'gemini'
+  return undefined
 }
 
-function requireSafeOpenAiImageUrl(value: string): string {
+function requireDownloadableImageUrl(value: string): string {
+  if (!imageDownloadSite(value)) throw new Error('Unsupported image source')
+  return value
+}
+
+// A redirect stays with the source's own image hosts.
+function requireSafeRedirect(source: string, value: string): void {
   const url = parseHttpsUrl(value)
-  if (!url || !isOpenAiImageHost(url.hostname)) throw new Error('Image redirected to an untrusted site')
-  return url.href
+  const allowed = imageDownloadSite(source) === 'gemini' ? url?.hostname.endsWith('.googleusercontent.com') : url && isOpenAiImageHost(url.hostname)
+  if (!allowed) throw new Error('Image redirected to an untrusted site')
 }
 
 function parseHttpsUrl(value: string): URL | undefined {

@@ -3,6 +3,7 @@ import { keepDeepestResponseContainers } from '../responseContainers'
 import { readResponseTextFromCopyAction, findClickableCopyButton } from './clipboardCopy'
 import { readEditorText, setContentEditableText } from './contentEditable'
 import { extractMarkdownFromDom } from './domMarkdown'
+import { extractResponseImages } from './responseImages'
 import { buttonLabelMatches, describeElement, extractCleanTextFromDom, findClosestMatchingAncestor } from './domText'
 import { isClickableButton, waitForClickableButton, waitForElement } from './waitForElement'
 
@@ -91,6 +92,9 @@ export function createGeminiAdapter(options: GeminiAdapterOptions = {}): ChatSit
     readResponseText: extractCleanText,
     readResponseTextFromCopy: node => readResponseTextFromCopy(node, clipboardTimeoutMs, clipboardPollMs),
     readResponseMarkdown: extractMarkdownFromDom,
+    // Live DOM (Nov 2026): generated images as generated-image > ... > img (blob:), charts from code as
+    // full-width-image > ... > img (lh3.googleusercontent.com, downloaded by the background).
+    readResponseImages: node => extractResponseImages(node, 'generated-image img, .generated-images img, full-width-image img'),
     findResponseContainer,
     isGenerating: isGeminiGenerating,
     stopGenerating: stopGeminiGenerating,

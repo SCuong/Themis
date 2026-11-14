@@ -1,5 +1,6 @@
 import type { RoleToBackgroundMessage } from '../group/runtimeProtocol'
 import type { ReplyImageSource } from '../group/types'
+import { inlineReplyImages } from './inlineReplyImages'
 import { createReplyTimeout } from './replyTimeout'
 import { createReplyTracker } from './replyTracker'
 import { resolveReportableReplyText, type ReportableReplyText } from './reportableReply'
@@ -285,19 +286,20 @@ export function createReplyObserver(options: {
     log.info('reply:accepted', { messageId, textLength: text.length, roleId: assignedRole.roleId, roleName: assignedRole.roleName, source })
 
     const snapshot = siteAdapter.getConversationSnapshot()
-    options
-      .sendRuntimeMessage({
+    const chatId = roleSession.getAssignedChatId(assignedRole)
+    inlineReplyImages(reply.images)
+      .then(images => options.sendRuntimeMessage({
         type: 'TEAM_ROLE_REPLY',
-        chatId: roleSession.getAssignedChatId(assignedRole),
+        chatId,
         roleId: assignedRole.roleId,
         messageId,
         replyAttemptId,
         content: text,
         contentFormat: reply.contentFormat,
-        images: reply.images,
+        images,
         conversationId: snapshot.conversationId,
         conversationUrl: snapshot.conversationUrl,
-      })
+      }))
       .then(() => {
         const activePrompt = roleSession.getActivePrompt()
         if (activePrompt) {

@@ -53,6 +53,8 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
   let loadedScope: NoteScope | undefined
   let loadedChatId: string | undefined
   let saveTimer: number | undefined
+  // Notes sent to the background that this page's store does not hold yet, by scope and chat.
+  const unconfirmedNotes = new Map<string, RichNoteDocument>()
   let dragStart: { pointerId: number; startX: number; startY: number; startLeft: number; startTop: number } | undefined
   let resizeStart: { pointerId: number; startX: number; startY: number; startWidth: number; startHeight: number; startLeft: number; startTop: number } | undefined
 
@@ -69,7 +71,10 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
 
     if (deps.state.notesPanelOpen) ensureEditor()?.catch(() => undefined)
     const nextChatId = scope === 'chat' ? chat?.id : undefined
-    if (loadedScope !== scope || loadedChatId !== nextChatId) {
+    const noteChanges = loadedScope !== scope || loadedChatId !== nextChatId
+    // Save the pending edit to the note it was typed in, before the editor shows another note or hides.
+    if (noteChanges || !deps.state.notesPanelOpen) flushPendingSave()
+    if (noteChanges) {
       loadedScope = scope
       loadedChatId = nextChatId
       editor?.setContent(readNoteContent(scope, nextChatId))
@@ -112,6 +117,7 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
     window.addEventListener('pointercancel', stopDragging)
     window.addEventListener('pointercancel', stopResizing)
     window.addEventListener('resize', clampFloatingPanelPosition)
+    window.addEventListener('pagehide', flushPendingSave)
   }
 
   function insertTextIntoActiveNote(text: string): void {
@@ -132,7 +138,8 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
   }
 
   function destroy(): void {
-    if (saveTimer !== undefined) window.clearTimeout(saveTimer)
+    flushPendingSave()
+    window.removeEventListener('pagehide', flushPendingSave)
     deps.notesDragHandleEl.removeEventListener('pointerdown', startDragging)
     deps.notesResizeHandleEl.removeEventListener('pointerdown', startResizing)
     window.removeEventListener('pointermove', moveDraggingPanel)
@@ -308,8 +315,21 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
 
   function readNoteContent(scope: NoteScope, chatId: string | undefined): RichNoteDocument {
     const store = deps.getStore()
-    if (scope === 'chat' && chatId) return store.chatNotesById?.[chatId] ?? EMPTY_NOTE
-    return store.globalNote ?? EMPTY_NOTE
+    const stored = scope === 'chat' && chatId ? store.chatNotesById?.[chatId] : store.globalNote
+    // Store updates can arrive out of order, so the typed text wins until the store shows it.
+    const key = noteKey(scope, chatId)
+    const unconfirmed = unconfirmedNotes.get(key)
+    if (unconfirmed && JSON.stringify(stored) !== JSON.stringify(unconfirmed)) return unconfirmed
+    unconfirmedNotes.delete(key)
+    return stored ?? EMPTY_NOTE
+  }
+
+  function noteKey(scope: NoteScope, chatId: string | undefined): string {
+    return scope === 'chat' && chatId ? `chat:${chatId}` : 'global'
+  }
+
+  function flushPendingSave(): void {
+    if (saveTimer !== undefined) saveActiveNote()
   }
 
   function scheduleSaveActiveNote(): void {
@@ -325,10 +345,12 @@ export function createNotesView(deps: NotesViewDependencies): NotesView {
     }
     const scope = loadedScope ?? readAvailableScope(deps.getCurrentChat())
     const chatId = scope === 'chat' ? loadedChatId ?? deps.getCurrentChat()?.id : undefined
+    const content = editor.getJSON()
+    unconfirmedNotes.set(noteKey(scope, chatId), content)
     deps.runCommand('GROUP_NOTE_SAVE', {
       scope,
       ...(chatId ? { chatId } : {}),
-      content: editor.getJSON(),
+      content,
     }).catch(error => deps.showError(error instanceof Error ? error.message : String(error)))
   }
 

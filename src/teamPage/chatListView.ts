@@ -19,9 +19,6 @@ export interface ChatListViewDependencies {
   chatListEl: HTMLElement
   iframeHost: ChatListIframeHost
   getTemplates(): RoleTemplate[]
-  getChatRecentSummary(chat: GroupChat): string
-  roleToneClass(value: string): string
-  roleAvatarLabel(value: string): string
   emptyCard(title: string, body: string): HTMLElement
   renderSelectedChat(): void
   renderRolePanel(): void
@@ -73,10 +70,6 @@ export function createChatListView(deps: ChatListViewDependencies): ChatListView
         if (!deps.chatListEl.closest('[inert]')) focusInRow(chat.id, '.chat-name')
       })
 
-      const avatar = document.createElement('div')
-      avatar.className = `chat-avatar ${deps.roleToneClass(chat.name)}`
-      avatar.textContent = deps.roleAvatarLabel(chat.name)
-
       const body = document.createElement('div')
       body.className = 'chat-item-body'
 
@@ -90,7 +83,7 @@ export function createChatListView(deps: ChatListViewDependencies): ChatListView
       const menuButton = document.createElement('button')
       menuButton.type = 'button'
       menuButton.className = 'icon-btn chat-menu-btn'
-      menuButton.setAttribute('aria-label', language() === 'en' ? `Open chat menu for ${chat.name}` : `Open ${chat.name} 's group chat menu`)
+      menuButton.setAttribute('aria-label', language() === 'en' ? `Open chat menu for ${chat.name}` : `Mở menu của ${chat.name}`)
       menuButton.textContent = '⋯'
       menuButton.setAttribute('aria-expanded', String(deps.state.chatMenuChatId === chat.id))
       menuButton.addEventListener('click', event => {
@@ -100,18 +93,13 @@ export function createChatListView(deps: ChatListViewDependencies): ChatListView
         focusInRow(chat.id, '.chat-menu-btn')
       })
       row.append(name)
-
-      const summary = document.createElement('div')
-      summary.className = 'summary-line'
-      summary.textContent = deps.getChatRecentSummary(chat)
-
-      body.append(row, summary)
+      body.append(row)
 
       const side = document.createElement('div')
       side.className = 'chat-item-side'
       side.append(menuButton)
 
-      item.append(avatar, body, side)
+      item.append(body, side)
       if (deps.state.chatMenuChatId === chat.id) item.append(chatActionMenu(chat))
       deps.chatListEl.append(item)
     }
@@ -130,19 +118,20 @@ export function createChatListView(deps: ChatListViewDependencies): ChatListView
       return
     }
     deps.state.selectedChatId = chatId
+    deps.state.pendingSwitchChatId = chatId
     deps.state.selectedRoleId = undefined
     deps.state.selectedReference = undefined
     deps.state.peopleDrawerOpen = false
     deps.state.chatMenuChatId = undefined
     deps.state.roleSiteMenuRoleId = undefined
+    // Sent before the render: rendering saves a pending note edit, and the store that save returns must
+    // already name this chat, or applying it would switch back.
+    deps.runCommand('GROUP_CHAT_SWITCH', { chatId })
+      .catch(error => deps.showError(error.message))
+      .finally(() => {
+        if (deps.state.pendingSwitchChatId === chatId) deps.state.pendingSwitchChatId = undefined
+      })
     deps.renderSelectedChat()
-    if (deps.state.pendingSwitchAnimationFrame !== undefined) window.cancelAnimationFrame(deps.state.pendingSwitchAnimationFrame)
-    deps.state.pendingSwitchAnimationFrame = window.requestAnimationFrame(() => {
-      deps.state.pendingSwitchAnimationFrame = undefined
-      if (deps.state.selectedChatId !== chatId) return
-      deps.runCommand('GROUP_CHAT_SWITCH', { chatId })
-        .catch(error => deps.showError(error.message))
-    })
   }
 
   function chatActionMenu(chat: GroupChat): HTMLElement {

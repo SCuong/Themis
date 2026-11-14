@@ -8,6 +8,7 @@ import { waitBeforePromptInput, PROMPT_INPUT_DELAY_MS } from './promptDelay'
 import { promptStatusMessage } from './promptStatus'
 import { createReplyObserver, type ReplyObserverController } from './replyObserver'
 import { readResyncReplyText } from './reportableReply'
+import { inlineReplyImages } from './inlineReplyImages'
 import { contentLog as log, sendRuntimeMessage, type ContentRuntimeMessage } from './runtimeClient'
 import { createRoleSession } from './roleSession'
 import { getActiveChatSiteAdapter } from './sites'
@@ -159,7 +160,7 @@ function handleResyncReplyMessage(message: Extract<BackgroundToRoleMessage, { ty
   })
 
   readResyncReplyText(siteAdapter, message.currentContent, log)
-    .then(reply => {
+    .then(async reply => {
       log.warn('message:resync-reply:read', {
         chatId: message.chatId,
         roleId: message.roleId,
@@ -175,7 +176,7 @@ function handleResyncReplyMessage(message: Extract<BackgroundToRoleMessage, { ty
         messageId: message.messageId,
         content: reply.text,
         contentFormat: reply.contentFormat,
-        images: reply.images,
+        images: await inlineReplyImages(reply.images),
         conversationId: snapshot.conversationId,
         conversationUrl: snapshot.conversationUrl,
       })

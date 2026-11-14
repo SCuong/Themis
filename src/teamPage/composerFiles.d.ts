@@ -3,8 +3,7 @@ import type { GroupMessage } from '../group/types'
 
 declare global {
   var themisComposerFiles: {
-    list(): unknown[]
-    clear(): void
+    take(): { files: unknown[]; restore(): void }
     messageFiles(message: GroupMessage): HTMLElement | undefined
   } | undefined
   var ThemisMarkdownIt: unknown

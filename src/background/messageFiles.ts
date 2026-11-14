@@ -1,6 +1,8 @@
 // Files attached in the composer travel with the message as data URLs: site members get them pasted into
 // their composer, API members get text files inlined into the prompt.
 import type { PromptFile } from '../group/runtimeProtocol'
+import type { MessageFile } from '../group/types'
+import { readComposerFileBlobs } from './cleanupQueue'
 
 export interface MessageFileInput extends PromptFile {
   type: string
@@ -34,6 +36,29 @@ export function readMessageFiles(value: unknown): MessageFileInput[] {
       dataUrl: file.dataUrl,
     }
   })
+}
+
+// A message keeps only its file details, so a retry reads the bytes back from the composer file store.
+// It throws when a file is gone: a prompt must never go out with fewer files than its message has.
+export async function loadMessageFiles(files: MessageFile[] | undefined): Promise<MessageFileInput[]> {
+  if (!files?.length) return []
+  const blobs = await readComposerFileBlobs(files.map(file => file.id))
+  const missing = files.filter((_, index) => !blobs[index]).map(file => `"${file.name}"`)
+  if (missing.length) throw new Error(`Cannot retry: attached file ${missing.join(', ')} is no longer stored on this device. Attach it again and send a new message.`)
+  return Promise.all(files.map(async (file, index) => {
+    const bytes = new Uint8Array(await blobs[index]!.arrayBuffer())
+    let binary = ''
+    // In chunks: one call with every byte as an argument overflows the stack.
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+    return { name: file.name, type: file.type, size: file.size, id: file.id, dataUrl: `data:${file.type || 'application/octet-stream'};base64,${btoa(binary)}` }
+  }))
+}
+
+// Site members get the files pasted into their composer; API members get the text inlined into the prompt.
+export function addFilesToDelivery(prepared: { delivery?: { message: { files?: PromptFile[] } }; externalDelivery?: { prompt: string } }, files: MessageFileInput[]): void {
+  if (!files.length) return
+  if (prepared.delivery) prepared.delivery.message.files = files
+  if (prepared.externalDelivery) prepared.externalDelivery.prompt += filesAsPromptText(files)
 }
 
 // API models cannot receive files, so readable text files are appended to the prompt instead.

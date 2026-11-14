@@ -69,6 +69,8 @@ test('attachments preview as tiles, open in the viewer, go out with the message 
     assert.equal(page.url(), 'https://themis.test/team.html');
 
     await page.setViewportSize({ width: 375, height: 812 });
+    // A phone is touch input: target size follows the pointer, not the window width (PRODUCT.md).
+    await (await page.context().newCDPSession(page)).send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
     await page.locator('#composer-file-input').setInputFiles([{ name: 'a-very-long-file-name-for-the-narrow-composer.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(2048) }]);
     await page.locator('#composer-files .file-tile').nth(1).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'tiles must not overflow a narrow viewport');

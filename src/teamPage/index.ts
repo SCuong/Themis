@@ -24,7 +24,7 @@ import { createTeamPagePrimaryCoordinator } from './teamPagePrimary'
 import { createErrorPresenter, createSuccessPresenter, teamPageLog } from './teamPageServices'
 import { createThemeController } from './themeController'
 import { createTeamUiController } from './teamUiController'
-import { emptyCard, getChatRecentSummary as getStoreChatRecentSummary, messageTitle, roleAvatarLabel, roleToneClass } from './viewHelpers'
+import { emptyCard, messageTitle, roleAvatarLabel, roleToneClass } from './viewHelpers'
 import { initializeTeamUI } from '../../team-ui.js'
 import { createIndexedDbImageAttachmentRepository } from '../shared/imageAttachmentRepository'
 
@@ -176,9 +176,6 @@ const chatListView = createChatListView({
   chatListEl,
   iframeHost,
   getTemplates,
-  getChatRecentSummary: chat => getStoreChatRecentSummary(chat, store),
-  roleToneClass,
-  roleAvatarLabel,
   emptyCard,
   renderSelectedChat,
   renderRolePanel,

@@ -321,6 +321,8 @@ export interface GroupMessage {
 
 export interface ReplyImageSource {
   sourceUrl: string
+  // The image bytes, read inside the site page (blob: sources cannot be fetched from anywhere else).
+  dataUrl?: string
   alt?: string
   width?: number
   height?: number

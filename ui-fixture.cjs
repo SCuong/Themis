@@ -75,9 +75,14 @@ function installFakeChrome({ seed }) {
           if (message.type === 'GROUP_SETTINGS_UPDATE' && message.language) {
             seed.settings.language = message.language;
           }
-          const result = { ok: true, store: seed, roles: Object.values(seed.rolesById), bindings: [], controlStatus: { state: 'disabled', port: 19305 } };
-          if (callback) { queueMicrotask(() => callback(result)); return; }
-          return Promise.resolve(result);
+          if (message.type === 'GROUP_NOTE_SAVE') {
+            if (message.scope === 'global') seed.globalNote = message.content;
+            else (seed.chatNotesById ??= {})[message.chatId] = message.content;
+          }
+          // A test can set window.__fixtureHold to delay a reply (or replace it) and so control the timing.
+          const reply = Promise.resolve(window.__fixtureHold?.(message)).then(override => override ?? { ok: true, store: seed, roles: Object.values(seed.rolesById), bindings: [], controlStatus: { state: 'disabled', port: 19305 } });
+          if (callback) { reply.then(callback); return; }
+          return reply;
         },
       },
       tabs: { getCurrent: async () => ({ id: 77 }), create: async () => ({ id: 78 }) },

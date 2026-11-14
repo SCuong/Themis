@@ -79,7 +79,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): ChatSit
     getAllAssistantReplies,
     readResponseText: extractCleanText,
     readResponseTextFromCopy: node => readResponseTextFromCopy(node, clipboardTimeoutMs, clipboardPollMs),
-    readResponseMarkdown: extractMarkdownFromDom,
+    readResponseMarkdown: readClaudeMarkdown,
     findResponseContainer,
     isGenerating: isClaudeGenerating,
     checkStatus: checkClaudeStatus,
@@ -190,4 +190,13 @@ function checkClaudeStatus(): SiteStatusInfo {
   }
 
   return { status: 'ready', timestamp }
+}
+
+// An artifact opens in a side panel; the reply only carries a card naming it, beside the reply text in the same
+// assistant message (live DOM, Nov 2026: [data-testid="frame-card-open"] "Bộ đếm"). The name gets its own line.
+function readClaudeMarkdown(node: Node): string {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
+  const message = element?.closest('[data-testid="assistant-message"]')
+  const artifacts = [...message?.querySelectorAll('[data-testid="frame-card-open"]') ?? []].map(card => card.textContent?.trim()).filter(Boolean)
+  return [extractMarkdownFromDom(node), ...artifacts.map(title => `🧩 ${title} (artifact)`)].filter(Boolean).join('\n\n')
 }
