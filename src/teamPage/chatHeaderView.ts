@@ -26,12 +26,12 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
   function renderChatHeader(): void {
     const chat = deps.getCurrentChat()
     const roles = deps.getCurrentRoles()
-    const messages = deps.getCurrentMessages()
     if (!chat) {
       deps.chatTitleEl.textContent = ui('No chat selected')
-      deps.chatSubtitleEl.textContent = ui('Create or select a chat to start collaborating')
+      deps.chatSubtitleEl.hidden = true
       deps.chatStatusEl.className = 'status-pill'
       deps.chatStatusEl.textContent = ui('Empty')
+      deps.chatStatusEl.removeAttribute('title')
       deps.togglePeopleDrawerEl.textContent = ui('Members 0')
       deps.togglePeopleDrawerEl.disabled = true
       deps.openOrchestrationEl.hidden = true
@@ -44,9 +44,13 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
 
     deps.chatTitleEl.textContent = chat.name
     deps.chatTitleEl.title = chat.name
-    deps.chatSubtitleEl.textContent = roles.length ? ui(`${modeLabel(chat.mode)} · ${roles.length} members · ${messages.length} messages`) : ui('No members yet')
+    // The mode sits beside the title as a badge; the member count lives on the Members button.
+    deps.chatSubtitleEl.hidden = false
+    deps.chatSubtitleEl.textContent = ui(modeLabel(chat.mode))
     deps.chatStatusEl.className = `status-pill status-${chat.status}`
     deps.chatStatusEl.textContent = ui(chatStatusLabel(chat.status))
+    // Shown as a dot alone when the header is tight; the tooltip still names it.
+    deps.chatStatusEl.title = deps.chatStatusEl.textContent
     deps.togglePeopleDrawerEl.disabled = false
     deps.togglePeopleDrawerEl.textContent = ui(`Members ${roles.length}`)
     deps.togglePeopleDrawerEl.setAttribute('aria-label', ui(deps.state.peopleDrawerOpen ? 'Collapse people panel' : 'Open people panel'))
@@ -67,7 +71,8 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
       document.getElementById('composer-options')?.append(manualMentionToggle)
     }
     manualMentionToggle.hidden = chat.mode !== 'collaborative'
-    manualMentionToggle.disabled = false
+    // Locked with the composer until the chat has members.
+    manualMentionToggle.disabled = roles.length === 0
     const plainMessagesReplyAll = chat.requireManualMention === false
     const ruleHint = 'When on, plain messages ask all members to reply; when off, only @ members or @all trigger replies.'
     manualMentionToggle.textContent = ui('Everyone replies')
@@ -85,7 +90,7 @@ export function createChatHeaderView(deps: ChatHeaderViewDependencies): ChatHead
 }
 
 function modeLabel(mode: RoomMode): string {
-  return mode === 'collaborative' ? 'Collaborative mode' : 'Independent expert mode'
+  return mode === 'collaborative' ? 'Collaborative chat' : 'Independent experts'
 }
 
 function chatStatusLabel(status: GroupChat['status']): string {

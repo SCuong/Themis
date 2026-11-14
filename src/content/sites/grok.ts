@@ -3,6 +3,7 @@ import { keepDeepestResponseContainers } from '../responseContainers'
 import { findClickableCopyButton, readResponseTextFromCopyAction } from './clipboardCopy'
 import { readEditorText, setContentEditableText } from './contentEditable'
 import { extractMarkdownFromDom } from './domMarkdown'
+import { extractResponseImages } from './responseImages'
 import { buttonLabelMatches, describeElement, extractCleanTextFromDom, findClosestMatchingAncestor } from './domText'
 import { isClickableButton } from './waitForElement'
 
@@ -82,6 +83,8 @@ export function createGrokAdapter(options: GrokAdapterOptions = {}): ChatSiteAda
     readResponseText: extractCleanText,
     readResponseTextFromCopy: node => readResponseTextFromCopy(node, clipboardTimeoutMs, clipboardPollMs),
     readResponseMarkdown: extractMarkdownFromDom,
+    // shortcut: size-based (Grok's image card DOM not captured yet; its image quota was used up); give it a selector once seen.
+    readResponseImages: node => extractResponseImages(node, 'img', isGrokGeneratedImage),
     findResponseContainer,
     isGenerating: isGrokGenerating,
     stopGenerating: stopGrokGenerating,
@@ -317,4 +320,12 @@ function isVisibleInteractiveElement(element: Element): boolean {
 
 function waitForNextGrokPoll(): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, 50))
+}
+
+// An image the reply shows at picture size; icons, avatars and KaTeX's drawn glyphs are smaller or inside .katex.
+function isGrokGeneratedImage(image: HTMLImageElement): boolean {
+  if (image.closest('.katex')) return false
+  const width = image.naturalWidth || image.width
+  const height = image.naturalHeight || image.height
+  return width >= 256 && height >= 256
 }

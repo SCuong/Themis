@@ -79,6 +79,7 @@ interface StartStagePreparationRetry {
   delayMs: number
   retryCount: number
   reason: string
+  busy?: boolean
 }
 
 export async function startOrchestrationRun(deps: OrchestrationRuntimeDependencies, input: { chatId: string; flowId: string; task: string; maxRounds?: number; maxNodeExecutions?: number }, isTest = false): Promise<{ store: OpenTeamStore; run: OrchestrationRun }> {
@@ -92,7 +93,8 @@ export async function startOrchestrationRun(deps: OrchestrationRuntimeDependenci
       const activeRun = activeRunId ? store.orchestrationRunsById[activeRunId] : undefined
       if (activeRun && activeRun.status === 'pending') throw new Error('This group chat already has a running workflow')
       if (activeRun && activeRun.status === 'running') {
-        if (hasLiveRunningRolePrompt(store, chat, activeRun)) throw new Error('This group chat already has a running workflow')
+        // A reserved node is still going to run (its start may be waiting for a busy member).
+        if (hasLiveRunningRolePrompt(store, chat, activeRun) || activeRun.stageRuns.some(stageRun => stageRun.status === 'pending')) throw new Error('This group chat already has a running workflow')
         stopStaleActiveRun(store, chat, activeRun, timestamp)
       }
       if (activeRunId && !activeRun) delete store.activeOrchestrationRunIdByChatId[chat.id]
@@ -138,7 +140,7 @@ export async function startOrchestrationRun(deps: OrchestrationRuntimeDependenci
       chat.status = 'running'
     }
     chat.updatedAt = timestamp
-    return { run, stageIndices: rootStageIndices(flow) }
+    return { run, stageIndices: reserveStageRuns(run, flow, rootStageIndices(flow), timestamp) }
   })
 
   if (!isTest) await deps.broadcastStoreUpdated(store)
@@ -149,19 +151,23 @@ export async function startOrchestrationRun(deps: OrchestrationRuntimeDependenci
 
 export async function stopOrchestrationRun(deps: OrchestrationRuntimeDependencies, chatId: string): Promise<{ store: OpenTeamStore; run?: OrchestrationRun }> {
   const timestamp = deps.now()
+  const releasedDeliveries: Array<{ messageId: string; roleId: string }> = []
   const active = await mutateStore(store => {
     const chat = requireChat(store, chatId)
     const runId = store.activeOrchestrationRunIdByChatId[chat.id]
     const run = runId ? store.orchestrationRunsById[runId] : undefined
     if (!run) return undefined
+    const runPromptIds = runPromptMessageIds(run)
     run.status = 'stopped'
     run.updatedAt = timestamp
     run.completedAt = timestamp
     for (const stageRun of run.stageRuns) {
       if (stageRun.status === 'running' || stageRun.status === 'pending' || stageRun.status === 'error') {
         stageRun.status = 'skipped'
+        stageRun.interrupted = true
         stageRun.completedAt = timestamp
         for (const roleRun of Object.values(stageRun.roleRuns)) {
+          if (roleRun.status === 'running' && roleRun.messageId) releasedDeliveries.push({ messageId: roleRun.messageId, roleId: roleRun.roleId })
           if (roleRun.status === 'running' || roleRun.status === 'pending' || roleRun.status === 'error') {
             roleRun.status = 'skipped'
             roleRun.completedAt = timestamp
@@ -170,20 +176,30 @@ export async function stopOrchestrationRun(deps: OrchestrationRuntimeDependencie
       }
     }
     delete store.activeOrchestrationRunIdByChatId[chat.id]
-    for (const role of getChatRoles(store, chat)) {
-      if (role.status === 'thinking') {
-        role.status = 'stopped'
-        delete role.lastPromptMessageId
-        delete role.replyAttemptId
-        role.updatedAt = timestamp
-      }
-    }
+    stopRunRoles(store, chat, runPromptIds, timestamp)
     chat.status = deps.getChatStatusFromRoles(store, chat)
     chat.updatedAt = timestamp
     return run
   })
+  // Free per-site delivery slots (DeepSeek allows two at a time) so later normal messages are not queued
+  // behind prompts that will never be answered.
+  for (const delivery of releasedDeliveries) await deps.promptDeliveryLimiter?.complete(chatId, delivery.messageId, delivery.roleId)
   await deps.broadcastStoreUpdated(active.store)
   return { store: active.store, run: active.result }
+}
+
+// Waits for busy members and unready frames live only in this service worker's memory. When the worker
+// restarts, reserved nodes of active runs are started again (a reservation starts at most once).
+export async function resumeReservedOrchestrationStages(deps: OrchestrationRuntimeDependencies): Promise<void> {
+  const { result: reserved } = await mutateStore(store => Object.values(store.activeOrchestrationRunIdByChatId)
+    .map(runId => store.orchestrationRunsById[runId])
+    .filter((run): run is OrchestrationRun => Boolean(run) && (run.status === 'running' || run.status === 'pending'))
+    .map(run => ({ runId: run.id, stageIndices: pendingStageIndices(run) }))
+    .filter(entry => entry.stageIndices.length > 0))
+  for (const entry of reserved) {
+    deps.log.info('orchestration-runtime:resume-reserved-stages', entry)
+    await startStages(deps, entry.runId, entry.stageIndices)
+  }
 }
 
 export async function detectAndHandleStaleRuns(deps: OrchestrationRuntimeDependencies): Promise<void> {
@@ -224,6 +240,7 @@ export async function resumeOrchestrationRun(deps: OrchestrationRuntimeDependenc
     if (run.status !== 'stopped') throw new Error('Only stopped workflows can be resumed')
     const flow = requireFlow(store, chat.id, run.flowId)
     validateExecutableFlow(store, chat, flow)
+    if (!getRunTaskMessage(store, chat, run)) throw new Error('The workflow task was deleted with the chat history. Start the workflow again')
     const last = currentStageRun(run)
     run.status = 'running'
     delete run.completedAt
@@ -232,10 +249,16 @@ export async function resumeOrchestrationRun(deps: OrchestrationRuntimeDependenc
     store.activeOrchestrationRunIdByChatId[chat.id] = run.id
     chat.status = 'running'
     chat.updatedAt = timestamp
-    if (!last) return { run, stageIndices: rootStageIndices(flow) }
+    if (!last) return { run, stageIndices: reserveStageRuns(run, flow, rootStageIndices(flow), timestamp) }
+    // Every node the stop interrupted (parallel branches included) runs again.
+    const interrupted = run.stageRuns.filter(stageRun => stageRun.interrupted)
+    if (interrupted.length > 0) {
+      run.stageRuns = run.stageRuns.filter(stageRun => !stageRun.interrupted)
+      return { run, stageIndices: reserveStageRuns(run, flow, interrupted.map(stageRun => stageRun.stageIndex), timestamp) }
+    }
     if (last.status === 'skipped' || last.status === 'error' || last.status === 'pending' || last.status === 'running') {
       removeStageRunAndFollowing(run, last)
-      return { run, stageIndices: [last.stageIndex] }
+      return { run, stageIndices: reserveStageRuns(run, flow, [last.stageIndex], timestamp) }
     }
     const next = nextStageDecision(store, chat, run, last, timestamp)
     return { run, stageIndices: next.next ? next.stageIndices : [] }
@@ -254,7 +277,9 @@ export async function maybeAdvanceOrchestrationRun(deps: OrchestrationRuntimeDep
     const chat = requireChat(store, input.chatId)
     const activeRunId = store.activeOrchestrationRunIdByChatId[chat.id]
     const run = activeRunId ? store.orchestrationRunsById[activeRunId] : undefined
-    if (!run || run.status !== 'running') return { next: false as const }
+    // While the run is in error a parallel node's reply is still recorded, so Retry finds it finished.
+    if (!run || (run.status !== 'running' && run.status !== 'error')) return { next: false as const }
+    const runFailed = run.status === 'error'
     const stageRun = findRunningStageRunForRolePrompt(run, input.roleId, promptMessageId)
     if (!stageRun || stageRun.status !== 'running') return { next: false as const }
     const roleRun = stageRun.roleRuns[input.roleId]
@@ -277,6 +302,12 @@ export async function maybeAdvanceOrchestrationRun(deps: OrchestrationRuntimeDep
       const reply = input.replyMessage
       if (!reply) return { next: false as const }
       const parsed = parseReviewDecision(reply.content)
+      if (!parsed.ok && runFailed) {
+        roleRun.status = 'error'
+        roleRun.error = parsed.error
+        stageRun.status = 'error'
+        return { next: false as const }
+      }
       if (!parsed.ok) {
         roleRun.status = 'error'
         roleRun.error = parsed.error
@@ -299,17 +330,28 @@ export async function maybeAdvanceOrchestrationRun(deps: OrchestrationRuntimeDep
       })
       stageRun.status = 'completed'
       stageRun.completedAt = timestamp
+      if (runFailed) {
+        // Same policy as a FAIL outside the error state: at the last attempt with "stop", the run ends.
+        const stage = requireFlow(store, chat.id, run.flowId).stages[stageRun.stageIndex]
+        if (parsed.decision.decision === 'fail' && stage && reviewAttemptCount(run, stage.id) >= reviewMaxAttempts(stage) && stage.review?.onMaxAttempts !== 'continue') {
+          failRun(store, chat, run, `Review failed; maximum review attempts reached (${reviewMaxAttempts(stage)} attempts)`, timestamp)
+        }
+        return { next: false as const }
+      }
       return applyReviewDecision(store, chat, run, stageRun, parsed.decision.decision, timestamp)
     }
 
     if (!allRoleRunsFinished(stageRun)) return { next: false as const }
     stageRun.status = 'completed'
     stageRun.completedAt = timestamp
+    if (runFailed) return { next: false as const }
     return nextStageDecision(store, chat, run, stageRun, timestamp)
   })
 
   await deps.broadcastStoreUpdated(advance.store)
   await deps.promptDeliveryLimiter?.complete(input.chatId, promptMessageId, input.roleId)
+  const advancedRunId = advance.store.orchestrationRunsById[advance.store.activeOrchestrationRunIdByChatId[input.chatId] ?? '']?.id ?? findRunIdForPrompt(advance.store, input.chatId, promptMessageId)
+  if (advancedRunId) await releaseEndedRunDeliveries(deps, advance.store, advancedRunId)
   if (advance.result.next) await startStages(deps, advance.result.runId, advance.result.stageIndices)
   return advance.store
 }
@@ -363,7 +405,7 @@ export async function retryOrchestrationStage(deps: OrchestrationRuntimeDependen
     if (restartingStageRun) return { runId: run.id, stageIndex: restartingStageRun.stageIndex, alreadyRestarting: true }
     const stageRun = findRetryableStageRun(run, stageId)
     if (!stageRun) throw new Error('No workflow node available to retry')
-    removeStageRunsAfter(run, stageRun)
+    // Later records are parallel siblings (a failed run starts nothing new), so they are kept.
     markStageRunRestarting(stageRun, timestamp)
     run.status = 'running'
     delete run.error
@@ -371,12 +413,16 @@ export async function retryOrchestrationStage(deps: OrchestrationRuntimeDependen
     run.updatedAt = timestamp
     chat.status = 'running'
     chat.updatedAt = timestamp
-    return { runId: run.id, stageIndex: stageRun.stageIndex, alreadyRestarting: false }
+    return { runId: run.id, stageIndex: stageRun.stageIndex, alreadyRestarting: false, waitingStageIndices: pendingStageIndices(run) }
   })
   if (prepared.result.alreadyRestarting) return { store: prepared.store }
   await deps.broadcastStoreUpdated(prepared.store)
   const started = await startStage(deps, prepared.result.runId, prepared.result.stageIndex)
-  return { store: started.store }
+  // Parallel nodes reserved before the error stopped waiting when the run failed; start them again.
+  const others = (prepared.result.waitingStageIndices ?? []).filter(index => index !== prepared.result.stageIndex)
+  if (others.length === 0) return { store: started.store }
+  await startStages(deps, prepared.result.runId, others)
+  return { store: (await mutateStore(store => store)).store }
 }
 
 export async function skipOrchestrationStage(deps: OrchestrationRuntimeDependencies, chatId: string, stageId?: string): Promise<{ store: OpenTeamStore }> {
@@ -397,7 +443,11 @@ export async function skipOrchestrationStage(deps: OrchestrationRuntimeDependenc
     run.status = 'running'
     delete run.error
     run.updatedAt = timestamp
-    return nextStageDecision(store, chat, run, stageRun, timestamp)
+    const waiting = pendingStageIndices(run)
+    const decision = nextStageDecision(store, chat, run, stageRun, timestamp)
+    // Parallel nodes reserved before the error stopped waiting when the run failed; start them again.
+    const stageIndices = uniqueNumbers([...(decision.next ? decision.stageIndices : []), ...waiting])
+    return stageIndices.length > 0 ? { next: true as const, runId: run.id, stageIndices } : decision
   })
   await deps.broadcastStoreUpdated(advance.store)
   if (advance.result.next) await startStages(deps, advance.result.runId, advance.result.stageIndices)
@@ -428,7 +478,9 @@ async function startStage(deps: OrchestrationRuntimeDependencies, runId: string,
       completeRun(store, chat, run, timestamp)
       return { deliveries: [], externalDeliveries: [] }
     }
-    if (run.stageRuns.length >= maxNodeExecutionsForRun(run)) {
+    // Only a reserved (pending) node may start, so one reservation never starts twice.
+    if (!run.stageRuns.some(stageRun => stageRun.stageIndex === stageIndex && stageRun.status === 'pending')) return { deliveries: [], externalDeliveries: [] }
+    if (run.stageRuns.filter(stageRun => stageRun.status !== 'pending').length >= maxNodeExecutionsForRun(run)) {
       failRun(store, chat, run, `Maximum node executions reached (${maxNodeExecutionsForRun(run)}). The workflow may contain a loop that does not converge.`, timestamp)
       return { deliveries: [], externalDeliveries: [] }
     }
@@ -531,6 +583,16 @@ async function startStage(deps: OrchestrationRuntimeDependencies, runId: string,
       delayMs: prepared.result.retry.delayMs,
       reason: prepared.result.retry.reason,
     })
+    // A busy member is waited for, never reloaded (recovery would discard the reply it is writing), and in
+    // the background, so Run, a reply or a retry does not hang until that member finishes. The pending
+    // reservation keeps the run from completing meanwhile.
+    if (prepared.result.retry.busy) {
+      const { delayMs } = prepared.result.retry
+      void waitForStagePreparationRetry(deps, delayMs)
+        .then(() => startStage(deps, runId, stageIndex, preparationAttempt + 1))
+        .catch(error => deps.log.warn('orchestration-stage:busy-retry-failed', { runId, stageIndex, error: error instanceof Error ? error.message : String(error) }))
+      return { store: prepared.store, deliveries: [], externalDeliveries: [] }
+    }
     const recovered = await deps.requestRoleRecovery?.(prepared.result.retry.chatId, prepared.result.retry.roleId, prepared.result.retry.reason).catch(() => false)
     deps.log.warn('orchestration-diagnostic:stage-preparation-recovery-result', {
       chatId: prepared.result.retry.chatId,
@@ -546,6 +608,7 @@ async function startStage(deps: OrchestrationRuntimeDependencies, runId: string,
   }
 
   await deps.broadcastStoreUpdated(prepared.store)
+  await releaseEndedRunDeliveries(deps, prepared.store, runId) // the node limit may have ended the run
   deps.log.warn('orchestration-diagnostic:stage-deliveries-start', {
     runId,
     stageIndex,
@@ -698,9 +761,37 @@ function lastReviewResult(run: OrchestrationRun): OrchestrationReviewResult | un
 
 function nextStageDecision(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, completedStageRun: OrchestrationStageRun, timestamp: number): NextStageDecision {
   const flow = requireFlow(store, chat.id, run.flowId)
-  const readyStageIndices = outgoingReadyStageIndices(flow, run, completedStageRun.stageId)
-  if (readyStageIndices.length > 0) return { next: true, runId: run.id, stageIndices: readyStageIndices }
+  return advanceRun(store, chat, run, flow, outgoingReadyStageIndices(flow, run, completedStageRun.stageId), timestamp)
+}
+
+// Reserves the direct targets first, so the sweep for waiting joins sees them as still to run, then the
+// joins that are ready now. With nothing left to run the run ends: in error while a failed node remains
+// (it can still be retried or skipped), completed otherwise.
+function advanceRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, flow: OrchestrationFlow, targets: number[], timestamp: number): NextStageDecision {
+  // One node at a time, upstream first, re-checking readiness after each reservation: reserving F makes
+  // its join D wait, whatever the order of the nodes in the flow.
+  const edges = effectiveGraphEdges(flow)
+  const stageIndices: number[] = []
+  for (;;) {
+    const candidates = uniqueNumbers([...targets, ...deferredReadyStageIndices(flow, run)])
+      .filter(index => !stageIndices.includes(index) && flow.stages[index] && isStageReadyFromIncoming(flow, run, flow.stages[index].id))
+    if (candidates.length === 0) break
+    const reach = new Map(candidates.map(index => [index, reachableStageIds(edges, [flow.stages[index].id])]))
+    const upstreamFirst = candidates.find(index => !candidates.some(other => other !== index
+      && reach.get(other)!.has(flow.stages[index].id) && !reach.get(index)!.has(flow.stages[other].id))) ?? candidates[0]
+    reserveStageRuns(run, flow, [upstreamFirst], timestamp)
+    stageIndices.push(upstreamFirst)
+  }
+  if (stageIndices.length > 0) return { next: true, runId: run.id, stageIndices }
   if (hasRunningStageRuns(run)) return { next: false }
+  if (hasUnresolvedErrorStageRun(run)) {
+    run.status = 'error'
+    run.error = run.error ?? 'A workflow node failed. Retry or skip it to continue'
+    run.updatedAt = timestamp
+    chat.status = 'error'
+    chat.updatedAt = timestamp
+    return { next: false }
+  }
   completeRun(store, chat, run, timestamp)
   return { next: false }
 }
@@ -714,16 +805,11 @@ function applyReviewDecision(store: OpenTeamStore, chat: GroupChat, run: Orchest
       failRun(store, chat, run, `Review failed; maximum review attempts reached (${reviewMaxAttempts(stage)} attempts)`, timestamp)
       return { next: false }
     }
-    const continueTargets = reviewBranchStageIndices(flow, stageRun.stageId, 'pass')
-    if (continueTargets.length > 0) return { next: true, runId: run.id, stageIndices: continueTargets }
-    if (!hasRunningStageRuns(run)) completeRun(store, chat, run, timestamp)
-    return { next: false }
+    return advanceRun(store, chat, run, flow, readyStageIndices(flow, run, reviewBranchStageIndices(flow, stageRun.stageId, 'pass')), timestamp)
   }
 
-  const branchTargets = reviewBranchStageIndices(flow, stageRun.stageId, decision)
-  if (branchTargets.length > 0) return { next: true, runId: run.id, stageIndices: branchTargets }
-  if (!hasRunningStageRuns(run)) completeRun(store, chat, run, timestamp)
-  return { next: false }
+  // Branch targets wait for their other sources like any join.
+  return advanceRun(store, chat, run, flow, readyStageIndices(flow, run, reviewBranchStageIndices(flow, stageRun.stageId, decision)), timestamp)
 }
 
 function completeRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, timestamp: number): void {
@@ -735,14 +821,45 @@ function completeRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRu
   chat.updatedAt = timestamp
 }
 
+// Ends the run in error. Parallel nodes still running are cut off like a stop and their members are
+// stopped, so nothing keeps waiting for a run that is over (callers free the delivery slots afterwards).
 function failRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, reason: string, timestamp: number): void {
+  const runPromptIds = runPromptMessageIds(run)
+  stopStaleActiveRun(store, chat, run, timestamp, reason)
+  stopRunRoles(store, chat, runPromptIds, timestamp)
   run.status = 'error'
   run.error = reason
-  run.completedAt = timestamp
-  run.updatedAt = timestamp
-  delete store.activeOrchestrationRunIdByChatId[chat.id]
   chat.status = 'error'
   chat.updatedAt = timestamp
+}
+
+function runPromptMessageIds(run: OrchestrationRun): Set<string | undefined> {
+  return new Set(run.stageRuns.flatMap(stageRun => Object.values(stageRun.roleRuns).map(roleRun => roleRun.messageId)))
+}
+
+// Stops members whose current prompt belongs to the run; a member answering a normal message is left alone.
+function stopRunRoles(store: OpenTeamStore, chat: GroupChat, runPromptIds: Set<string | undefined>, timestamp: number): void {
+  for (const role of getChatRoles(store, chat)) {
+    if (role.status === 'thinking' && role.lastPromptMessageId && runPromptIds.has(role.lastPromptMessageId)) {
+      role.status = 'stopped'
+      delete role.lastPromptMessageId
+      delete role.replyAttemptId
+      role.updatedAt = timestamp
+    }
+  }
+}
+
+// Frees the per-site delivery slots of every prompt of a run that is over (complete() ignores prompts
+// that hold no slot). A run in error that is still active can be retried, so its prompts keep their slots.
+async function releaseEndedRunDeliveries(deps: OrchestrationRuntimeDependencies, store: OpenTeamStore, runId: string): Promise<void> {
+  const run = store.orchestrationRunsById[runId]
+  if (!run || run.status === 'running' || run.status === 'pending' || !deps.promptDeliveryLimiter) return
+  if (store.activeOrchestrationRunIdByChatId[run.chatId] === run.id) return
+  for (const stageRun of run.stageRuns) {
+    for (const roleRun of Object.values(stageRun.roleRuns)) {
+      if (roleRun.messageId) await deps.promptDeliveryLimiter.complete(run.chatId, roleRun.messageId, roleRun.roleId)
+    }
+  }
 }
 
 function requireFlow(store: OpenTeamStore, chatId: string, flowId: string): OrchestrationFlow {
@@ -783,9 +900,14 @@ function findLocalRoleFrameBlocker(
   chat: GroupChat,
   roleIds: string[],
   deps: Pick<OrchestrationRuntimeDependencies, 'runtimeFrames'>,
-): Pick<StartStagePreparationRetry, 'roleId' | 'roleName' | 'reason'> | undefined {
+): Pick<StartStagePreparationRetry, 'roleId' | 'roleName' | 'reason' | 'busy'> | undefined {
   for (const roleId of roleIds) {
     const role = requireRole(store, chat.id, roleId)
+    // A member still answering keeps its turn however long it takes (slow models can be silent for
+    // minutes). Only a thinking state whose prompt is gone is ignored. Stopping the member releases it.
+    if (role.status === 'thinking' && role.lastPromptMessageId && store.messagesById[role.lastPromptMessageId]) {
+      return { roleId: role.id, roleName: role.name, reason: 'The member is still answering another message', busy: true }
+    }
     if (isExternalModelRole(role)) continue
     const binding = deps.runtimeFrames.getByRole(chat.id, role.id)
     if (!binding?.ready) {
@@ -831,7 +953,37 @@ function allRoleRunsFinished(stageRun: OrchestrationStageRun): boolean {
 }
 
 function hasRunningStageRuns(run: OrchestrationRun): boolean {
-  return run.stageRuns.some(stageRun => stageRun.status === 'running')
+  // A reserved (pending) node has not run yet, so the run is not finished.
+  return run.stageRuns.some(stageRun => stageRun.status === 'running' || stageRun.status === 'pending')
+}
+
+// A failed node counts only while it is the latest record of that node; a later rerun supersedes it.
+function isLatestStageRun(run: OrchestrationRun, stageRun: OrchestrationStageRun): boolean {
+  return run.stageRuns.map(candidate => candidate.stageId).lastIndexOf(stageRun.stageId) === run.stageRuns.indexOf(stageRun)
+}
+
+function hasUnresolvedErrorStageRun(run: OrchestrationRun): boolean {
+  return run.stageRuns.some(stageRun => stageRun.status === 'error' && isLatestStageRun(run, stageRun))
+}
+
+function findRunIdForPrompt(store: OpenTeamStore, chatId: string, promptMessageId: string): string | undefined {
+  return Object.values(store.orchestrationRunsById).find(run => run.chatId === chatId && run.stageRuns.some(stageRun => Object.values(stageRun.roleRuns).some(roleRun => roleRun.messageId === promptMessageId)))?.id
+}
+
+function pendingStageIndices(run: OrchestrationRun): number[] {
+  return uniqueNumbers(run.stageRuns.filter(stageRun => stageRun.status === 'pending').map(stageRun => stageRun.stageIndex))
+}
+
+// Records the chosen next nodes as pending in the same store mutation that chose them, so a sibling
+// that finishes before they start sees them and cannot complete the run.
+function reserveStageRuns(run: OrchestrationRun, flow: OrchestrationFlow, stageIndices: number[], timestamp: number): number[] {
+  const unique = uniqueNumbers(stageIndices)
+  for (const stageIndex of unique) {
+    const stage = flow.stages[stageIndex]
+    if (!stage || run.stageRuns.some(stageRun => stageRun.stageIndex === stageIndex && stageRun.status === 'pending')) continue
+    run.stageRuns.push({ stageId: stage.id, stageIndex, kind: stage.kind, round: run.currentRound, status: 'pending', roleRuns: {}, startedAt: timestamp })
+  }
+  return unique
 }
 
 async function isOrchestrationPromptDeliveryStillActive(chatId: string, roleId: string, messageId: string, replyAttemptId: string | undefined): Promise<boolean> {
@@ -843,7 +995,9 @@ async function isOrchestrationPromptDeliveryStillActive(chatId: string, roleId: 
     if (replyAttemptId && role.replyAttemptId !== replyAttemptId) return false
     const runId = store.activeOrchestrationRunIdByChatId[chat.id]
     const run = runId ? store.orchestrationRunsById[runId] : undefined
-    if (!run || run.status !== 'running') return false
+    // A parallel node queued behind a site limit is still delivered while another node's error awaits a
+    // retry; its reply is recorded and counts once the run continues.
+    if (!run || (run.status !== 'running' && run.status !== 'error')) return false
     return Boolean(findRunningStageRunForRolePrompt(run, roleId, messageId))
   })
   return result
@@ -860,17 +1014,20 @@ function hasLiveRunningRolePrompt(store: OpenTeamStore, chat: GroupChat, run: Or
   })
 }
 
-function stopStaleActiveRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, timestamp: number): void {
+// Returns the prompts that were still running, so the caller can free their delivery-limiter slots.
+export function stopStaleActiveRun(store: OpenTeamStore, chat: GroupChat, run: OrchestrationRun, timestamp: number, reason = 'The run state is no longer valid and has been automatically released'): Array<{ messageId: string; roleId: string }> {
+  const running: Array<{ messageId: string; roleId: string }> = []
   run.status = 'stopped'
   run.completedAt = timestamp
   run.updatedAt = timestamp
-  run.error = run.error ?? 'The run state is no longer valid and has been automatically released'
+  run.error = run.error ?? reason
   for (const stageRun of run.stageRuns) {
     if (stageRun.status === 'running' || stageRun.status === 'pending') {
       stageRun.status = 'skipped'
       stageRun.completedAt = timestamp
     }
     for (const roleRun of Object.values(stageRun.roleRuns)) {
+      if (roleRun.status === 'running' && roleRun.messageId) running.push({ messageId: roleRun.messageId, roleId: roleRun.roleId })
       if (roleRun.status === 'running' || roleRun.status === 'pending') {
         roleRun.status = 'skipped'
         roleRun.completedAt = timestamp
@@ -878,6 +1035,7 @@ function stopStaleActiveRun(store: OpenTeamStore, chat: GroupChat, run: Orchestr
     }
   }
   delete store.activeOrchestrationRunIdByChatId[chat.id]
+  return running
 }
 
 function outgoingReadyStageIndices(flow: OrchestrationFlow, run: OrchestrationRun, sourceStageId: string): number[] {
@@ -892,11 +1050,57 @@ function outgoingReadyStageIndices(flow: OrchestrationFlow, run: OrchestrationRu
   return uniqueNumbers(ready)
 }
 
+// A node waits while any of its sources can still run: the source, or a node upstream of it, is running
+// or reserved. Every source on the normal (non-Fail) path must have finished, and a review source on its
+// Pass port must have passed. A source inside a loop through this node must have finished after this
+// node's last execution, so a completion from an earlier iteration does not count. A source that only
+// runs after a review fails (a fixer) is waited for only while it can still run.
 function isStageReadyFromIncoming(flow: OrchestrationFlow, run: OrchestrationRun, stageId: string): boolean {
-  if (run.stageRuns.some(stageRun => stageRun.stageId === stageId && stageRun.status === 'running')) return false
-  const incoming = incomingEdgesByTarget(flow).get(stageId) ?? []
-  if (incoming.length <= 1) return true
-  return incoming.every(sourceStageId => run.stageRuns.some(stageRun => stageRun.stageId === sourceStageId && (stageRun.status === 'completed' || stageRun.status === 'skipped')))
+  const edges = effectiveGraphEdges(flow)
+  const inFlightIds = run.stageRuns.filter(stageRun => stageRun.status === 'running' || stageRun.status === 'pending').map(stageRun => stageRun.stageId)
+  if (inFlightIds.includes(stageId)) return false
+  const stillToRun = reachableStageIds(edges, inFlightIds)
+  const incoming = dependencyGraphEdges(flow).filter(edge => edge.targetStageId === stageId)
+  if (incoming.some(edge => stillToRun.has(edge.sourceStageId))) return false
+  const forward = forwardStageIds(flow)
+  const downstream = reachableStageIds(edges, [stageId])
+  const lastRunIndex = run.stageRuns.map(stageRun => stageRun.stageId).lastIndexOf(stageId)
+  return incoming
+    .filter(edge => forward.has(edge.sourceStageId))
+    .every(edge => isEdgeSatisfied(flow, run, edge, downstream.has(edge.sourceStageId) ? lastRunIndex : -1))
+}
+
+// The source's latest finished execution after `afterIndex` lets this edge through. A plain node lets
+// any edge through. A review lets its Pass edges (and unlabelled ones, which follow Pass) through when it
+// passed, was skipped, or failed but continues after its last attempt, and its Fail edges otherwise.
+function isEdgeSatisfied(flow: OrchestrationFlow, run: OrchestrationRun, edge: OrchestrationGraphSnapshot['edges'][number], afterIndex: number): boolean {
+  for (let index = run.stageRuns.length - 1; index > afterIndex; index -= 1) {
+    const stageRun = run.stageRuns[index]
+    if (stageRun.stageId !== edge.sourceStageId || (stageRun.status !== 'completed' && stageRun.status !== 'skipped')) continue
+    const stage = flow.stages[stageRun.stageIndex]
+    const port = reviewEdgeBranch(edge) ?? 'pass'
+    if (stage?.kind !== 'review') return port !== 'fail'
+    const decision = stageRun.reviewResults?.[stageRun.reviewResults.length - 1]?.decision
+    const continuesAfterLastAttempt = stage.review?.onMaxAttempts === 'continue' && reviewAttemptCount(run, stage.id) >= reviewMaxAttempts(stage)
+    return (decision === 'fail' && !continuesAfterLastAttempt ? 'fail' : 'pass') === port
+  }
+  return false
+}
+
+// Nodes that one source already let through but that had to wait for another source, and are ready now.
+// They are picked up whenever any node finishes, so a wait is never forgotten.
+function deferredReadyStageIndices(flow: OrchestrationFlow, run: OrchestrationRun): number[] {
+  // Fail edges count as triggers too: a FAIL recorded while the run was in error still opens its branch.
+  const edges = effectiveGraphEdges(flow)
+  return flow.stages.flatMap((stage, index) => {
+    const lastRunIndex = run.stageRuns.map(stageRun => stageRun.stageId).lastIndexOf(stage.id)
+    const triggered = edges.some(edge => edge.targetStageId === stage.id && isEdgeSatisfied(flow, run, edge, lastRunIndex))
+    return triggered && isStageReadyFromIncoming(flow, run, stage.id) ? [index] : []
+  })
+}
+
+function readyStageIndices(flow: OrchestrationFlow, run: OrchestrationRun, stageIndices: number[]): number[] {
+  return stageIndices.filter(index => flow.stages[index] && isStageReadyFromIncoming(flow, run, flow.stages[index].id))
 }
 
 function maxNodeExecutionsForRun(run: OrchestrationRun): number {
@@ -913,18 +1117,43 @@ function reviewAttemptCount(run: OrchestrationRun, stageId: string): number {
   return run.stageRuns.filter(stageRun => stageRun.stageId === stageId && stageRun.kind === 'review').length
 }
 
+// Nodes with no incoming edge start the run. A node entered only from a review's Fail port waits for
+// that review, unless the run cannot otherwise reach it: then it heads a revise loop and starts the run.
+// Among such loop heads, one that another head reaches without reaching it back (a Fail handler further
+// down the loop) still waits. Heads that reach each other (B,C -> review, Fail -> B,C) all start.
 function rootStageIndices(flow: OrchestrationFlow): number[] {
-  const targetIds = new Set(dependencyGraphEdges(flow).map(edge => edge.targetStageId))
-  const roots = flow.stages.map((stage, index) => targetIds.has(stage.id) ? undefined : index).filter((index): index is number => typeof index === 'number')
+  const edges = effectiveGraphEdges(flow)
+  const dependencyTargetIds = new Set(dependencyGraphEdges(flow).map(edge => edge.targetStageId))
+  const anyTargetIds = new Set(edges.map(edge => edge.targetStageId))
+  const rootIds = flow.stages.filter(stage => !anyTargetIds.has(stage.id)).map(stage => stage.id)
+  const reachedFromRoots = reachableStageIds(edges, rootIds)
+  const loopHeadIds = flow.stages.map(stage => stage.id).filter(id => !dependencyTargetIds.has(id) && !reachedFromRoots.has(id))
+  const reachByHead = new Map(loopHeadIds.map(id => [id, reachableStageIds(edges, [id])]))
+  for (const id of loopHeadIds) {
+    const downstreamOfAnotherHead = loopHeadIds.some(other => other !== id && reachByHead.get(other)!.has(id) && !reachByHead.get(id)!.has(other))
+    if (!downstreamOfAnotherHead) rootIds.push(id)
+  }
+  const roots = flow.stages.map((stage, index) => rootIds.includes(stage.id) ? index : undefined).filter((index): index is number => typeof index === 'number')
   return roots.length > 0 ? roots : [0]
 }
 
-function incomingEdgesByTarget(flow: OrchestrationFlow): Map<string, string[]> {
-  const incoming = new Map<string, string[]>()
-  for (const edge of dependencyGraphEdges(flow)) {
-    incoming.set(edge.targetStageId, [...incoming.get(edge.targetStageId) ?? [], edge.sourceStageId])
+// Nodes reachable from the roots without taking a Fail branch.
+function forwardStageIds(flow: OrchestrationFlow): Set<string> {
+  return reachableStageIds(dependencyGraphEdges(flow), rootStageIndices(flow).map(index => flow.stages[index].id))
+}
+
+function reachableStageIds(edges: OrchestrationGraphSnapshot['edges'], startIds: string[]): Set<string> {
+  const reached = new Set(startIds)
+  const queue = [...startIds]
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    for (const edge of edges) {
+      if (edge.sourceStageId !== id || reached.has(edge.targetStageId)) continue
+      reached.add(edge.targetStageId)
+      queue.push(edge.targetStageId)
+    }
   }
-  return incoming
+  return reached
 }
 
 function dependencyGraphEdges(flow: OrchestrationFlow): OrchestrationGraphSnapshot['edges'] {
@@ -967,25 +1196,28 @@ function requireActiveRun(store: OpenTeamStore, chat: GroupChat): OrchestrationR
   return run
 }
 
+// Without a stage id, the node the status view shows: the latest failed one, else the latest running
+// one, never a parallel node that is only reserved.
+function selectedStageRun(run: OrchestrationRun, stageId?: string): OrchestrationStageRun | undefined {
+  const latest = [...run.stageRuns].reverse()
+  if (stageId) return latest.find(stageRun => stageRun.stageId === stageId)
+  return latest.find(stageRun => stageRun.status === 'error' && isLatestStageRun(run, stageRun)) ?? latest.find(stageRun => stageRun.status === 'running') ?? currentStageRun(run)
+}
+
 function findRetryableStageRun(run: OrchestrationRun, stageId?: string): OrchestrationStageRun | undefined {
-  const candidate = stageId ? [...run.stageRuns].reverse().find(stageRun => stageRun.stageId === stageId) : currentStageRun(run)
+  const candidate = selectedStageRun(run, stageId)
   if (!candidate || (candidate.status !== 'error' && candidate.status !== 'running')) return undefined
   return candidate
 }
 
 function findRestartingStageRun(run: OrchestrationRun, stageId?: string): OrchestrationStageRun | undefined {
-  const candidate = stageId ? [...run.stageRuns].reverse().find(stageRun => stageRun.stageId === stageId) : currentStageRun(run)
+  const candidate = selectedStageRun(run, stageId)
   return candidate?.status === 'pending' ? candidate : undefined
 }
 
 function removeStageRunAndFollowing(run: OrchestrationRun, stageRun: OrchestrationStageRun): void {
   const index = run.stageRuns.indexOf(stageRun)
   if (index >= 0) run.stageRuns.splice(index)
-}
-
-function removeStageRunsAfter(run: OrchestrationRun, stageRun: OrchestrationStageRun): void {
-  const index = run.stageRuns.indexOf(stageRun)
-  if (index >= 0) run.stageRuns.splice(index + 1)
 }
 
 function markStageRunRestarting(stageRun: OrchestrationStageRun, timestamp: number): void {

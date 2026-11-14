@@ -110,7 +110,10 @@ function translateAttributes(root: ParentNode, language: TeamLanguage): void {
       const value = element.getAttribute(attribute)
       if (!value) continue
       const sources = attributeSourcesFor(element)
-      const source = sources.get(attribute) ?? value
+      const cached = sources.get(attribute)
+      // A value that is neither the cached source nor one of its translations was set by the app since the last pass.
+      const unchanged = cached !== undefined && (value === cached || translateUi(cached, 'en') === value || translateUi(cached, 'vi') === value)
+      const source = unchanged ? cached : value
       sources.set(attribute, source)
       element.setAttribute(attribute, translateUi(source, language))
     }

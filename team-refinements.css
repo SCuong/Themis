@@ -1,9 +1,9 @@
 /* Themis workspace and design tokens. team.css retains component mechanics. */
 :root {
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
-  --type-xs: .75rem; --type-sm: .8125rem; --type-base: .875rem; --type-prose: .9375rem; --type-lg: 1rem; --type-title: 1.25rem;
+  --type-xs: .75rem; --type-sm: .8125rem; --type-base: .875rem; --type-ui: var(--type-base); --type-prose: .9375rem; --type-lg: 1rem; --type-title: 1.25rem;
   --control-height: 44px; --control-compact: 44px; --icon-size: 18px; --radius-control: 8px; --radius-panel: 12px;
-  --rail-width: 64px; --sidebar-width: 272px; --conversation: 53rem;
+  --rail-width: 64px; --sidebar-width: 272px; --header-height: 64px; --conversation: 48rem;
   --motion: 160ms cubic-bezier(.2, .8, .2, 1); --motion-panel: 240ms cubic-bezier(.2, .8, .2, 1); --scrim: #071b2380; --glow: none;
   --icon-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z'/%3E%3C/svg%3E");
   --icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z'/%3E%3C/svg%3E");
@@ -30,11 +30,15 @@
   --icon-bold: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M178.48,115.7A44,44,0,0,0,148,40H80a8,8,0,0,0-8,8V200a8,8,0,0,0,8,8h80a48,48,0,0,0,18.48-92.3ZM88,56h60a28,28,0,0,1,0,56H88Zm72,136H88V128h72a32,32,0,0,1,0,64Z'/%3E%3C/svg%3E");
   --icon-italic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M200,56a8,8,0,0,1-8,8H157.77L115.1,192H144a8,8,0,0,1,0,16H64a8,8,0,0,1,0-16H98.23L140.9,64H112a8,8,0,0,1,0-16h80A8,8,0,0,1,200,56Z'/%3E%3C/svg%3E");
   --icon-strike: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M224,128a8,8,0,0,1-8,8H175.93c9.19,7.11,16.07,17.2,16.07,32,0,13.34-7,25.7-19.75,34.79C160.33,211.31,144.61,216,128,216s-32.33-4.69-44.25-13.21C71,193.7,64,181.34,64,168a8,8,0,0,1,16,0c0,17.35,22,32,48,32s48-14.65,48-32c0-14.85-10.54-23.58-38.77-32H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM76.33,104a8,8,0,0,0,7.61-10.49A17.3,17.3,0,0,1,83.11,88c0-18.24,19.3-32,44.89-32,18.84,0,34.16,7.42,41,19.85a8,8,0,0,0,14-7.7C173.33,50.52,152.77,40,128,40,93.29,40,67.11,60.63,67.11,88a33.73,33.73,0,0,0,1.62,10.49A8,8,0,0,0,76.33,104Z'/%3E%3C/svg%3E");
+  --icon-lock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M208,80H176V56a48,48,0,0,0-96,0V80H48A16,16,0,0,0,32,96V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V96A16,16,0,0,0,208,80ZM96,56a32,32,0,0,1,64,0V80H96ZM208,208H48V96H208V208Zm-68-56a12,12,0,1,1-12-12A12,12,0,0,1,140,152Z'/%3E%3C/svg%3E");
   --icon-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z'/%3E%3C/svg%3E");
   --icon-app: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M120,56v48a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V56A16,16,0,0,1,56,40h48A16,16,0,0,1,120,56Zm80-16H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm-96,96H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm96,0H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,200,136Z'/%3E%3C/svg%3E");
 }
-/* Secondary inline icon actions shrink for a mouse; touch keeps the full 44px target. */
-@media (pointer: fine) { :root { --control-compact: 36px; } }
+/* Density follows the pointer, never the window width: a mouse gets 32px controls at every window size and zoom level; touch keeps 44px.
+   Width breakpoints below only rearrange the layout (drawer sidebar, icon-only toolbar); they never change a control's size. */
+@media (pointer: fine) {
+  :root { --control-height: 32px; --control-compact: 28px; --icon-size: 16px; --type-ui: var(--type-sm); --rail-width: 48px; --sidebar-width: 248px; --header-height: 48px; }
+}
 :root[data-theme="light"] {
   /* Neutral greys like ChatGPT: near-black text and primary actions on white, no green. */
   --bg: #f9f9f9; --panel: #fff; --panel-strong: #fff; --panel-soft: #f4f4f4;
@@ -76,15 +80,16 @@ button { touch-action: manipulation; }
 :root[data-theme] :is(input, textarea, select, [contenteditable]) { caret-color: var(--brand); }
 :root[data-theme] :is(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 :root[data-theme] :is(input, textarea, select):focus { border-color: var(--brand); box-shadow: none; }
-:root[data-theme] :is(input, textarea, select) { min-width: 0; border-color: var(--line-strong); border-radius: var(--radius-control); background: var(--panel); color: var(--text); }
-:root[data-theme] input:not([type="radio"], [type="checkbox"]), :root[data-theme] select { min-height: var(--control-height); }
+/* The border already turns --brand: the ring sits on it instead of drawing a second frame 2px out. */
+:root[data-theme] :is(input, textarea, select):focus-visible { outline-offset: -1px; }
+:root[data-theme] :is(input, textarea, select) { min-width: 0; border-color: var(--line-strong); border-radius: var(--radius-control); background: var(--panel); color: var(--text); font-size: var(--type-base); font-weight: 400; }
+:root[data-theme] input:not([type="radio"], [type="checkbox"]), :root[data-theme] select { height: var(--control-height); min-height: 0; padding-block: 0; padding-inline: var(--space-3); }
 :root[data-theme] :is(h1, h2) { font-size: var(--type-title); line-height: 1.25; letter-spacing: -.015em; font-weight: 650; overflow-wrap: anywhere; }
 :root[data-theme] h3 { font-size: var(--type-base); font-weight: 650; overflow-wrap: anywhere; }
-/* Labels wrap their controls, so reset the inherited label weight inside fields. */
-:root[data-theme] .field :is(input, select, textarea) { font-size: var(--type-base); font-weight: 400; color: var(--text); }
 :root[data-theme] .tiny { font-size: var(--type-xs); line-height: 1.45; color: var(--muted); }
 :root[data-theme] fieldset.field { min-width: 0; margin: 0; padding: 0; border: 0; }
-.field legend { padding: 0 0 var(--space-2); font-weight: 620; }
+:root[data-theme] .field { font-size: var(--type-xs); font-weight: 600; }
+:root[data-theme] .field legend { padding: 0 0 var(--space-2); font: inherit; color: var(--muted); }
 :root[data-theme] :is(.btn, .icon-btn, .theme-option, .settings-segment-option, .note-tool-btn, .note-scope-tab, .template-type-tab, .template-category-chip, .group-template-category-filter, .role-site-option, .message-tool-btn) {
   min-height: var(--control-height); border-radius: var(--radius-control);
   font-size: var(--type-sm); font-weight: 600; box-shadow: none;
@@ -92,6 +97,7 @@ button { touch-action: manipulation; }
 }
 :root[data-theme] :is(.btn, .icon-btn, .note-tool-btn, .note-scope-tab, .role-site-option, .message-tool-btn) { border-color: transparent; background: transparent; color: var(--muted); }
 :root[data-theme] :is(.btn, .icon-btn, .note-tool-btn, .note-scope-tab, .role-site-option, .message-tool-btn):hover:not(:disabled) { border-color: transparent; background: var(--panel-soft); color: var(--text); box-shadow: none; }
+:root[data-theme] :is(.btn, .icon-btn, .note-tool-btn, .message-tool-btn, .rail-btn):active:not(:disabled, .btn-primary) { background: var(--brand-deep); }
 :root[data-theme] .btn:not(.btn-ghost, .btn-primary, .btn-danger, .icon-btn, .drawer-summary) { border-color: var(--line); color: var(--text); }
 :root[data-theme] .btn-primary, :root[data-theme] #send-message { border-color: transparent; background: var(--brand); color: var(--on-brand); box-shadow: none; }
 :root[data-theme] .btn-primary:hover:not(:disabled), :root[data-theme] #send-message:hover:not(:disabled) { background: var(--brand-hover); color: var(--on-brand); filter: none; }
@@ -105,7 +111,9 @@ button { touch-action: manipulation; }
 :root[data-theme] .icon-btn { width: var(--control-height); height: var(--control-height); flex-shrink: 0; }
 /* One icon set: glyph characters and mixed inline SVGs from the bundle are drawn as masks from the icon tokens. */
 :root[data-theme] :is(.modal-close, .role-prompt-close, [id="close-notes-panel"], .orchestration-node-editor-close, [id="restore-chat"], .role-refresh, .role-jump, .role-delete, .note-tool-btn:is([id$="-list"], [id$="undo"], [id$="redo"], [id$="bold"], [id$="italic"], [id$="strike"]), .message-tool-btn:has(path), .chat-menu-btn, .reference-draft .btn-ghost, .file-chip-remove, .role-prompt-detail, .launcher) {
-  display: inline-grid; place-items: center; padding: 0; font-size: 0;
+  /* place-content: the hidden glyph is still a (0px) grid row; packing rows at the centre keeps the icon centred instead of
+     stretching both rows and lifting it. */
+  display: inline-grid; place-items: center; place-content: center; padding: 0; font-size: 0;
 }
 :is(.role-delete, .role-prompt-detail, .message-tool-btn:has(path)) > svg { display: none; }
 :is(.modal-close, .role-prompt-close, [id="close-notes-panel"], .orchestration-node-editor-close, [id="restore-chat"], .role-refresh, .role-jump, .role-delete, .note-tool-btn:is([id$="-list"], [id$="undo"], [id$="redo"], [id$="bold"], [id$="italic"], [id$="strike"]), .message-tool-btn:has(path), .chat-menu-btn, .reference-draft .btn-ghost, .file-chip-remove, .role-prompt-detail, .launcher)::before {
@@ -136,7 +144,7 @@ button { touch-action: manipulation; }
 @media (forced-colors: active) { :is(.modal-close, .role-prompt-close, [id="close-notes-panel"], .orchestration-node-editor-close, [id="restore-chat"], .role-refresh, .role-jump, .role-delete, .note-tool-btn:is([id$="-list"], [id$="undo"], [id$="redo"], [id$="bold"], [id$="italic"], [id$="strike"]), .message-tool-btn:has(path), .chat-menu-btn, .reference-draft .btn-ghost, .file-chip-remove, .role-prompt-detail, .launcher)::before { background: ButtonText; forced-color-adjust: none; } }
 /* Phosphor icons are filled outlines: never stroke them. Fill weight marks the selected state. */
 :is(.icon-btn, .rail-btn, .theme-option, .drawer-summary) svg { stroke: none; fill: currentColor; }
-.icon-btn svg, .rail-btn svg, .theme-option svg { width: 20px; height: 20px; }
+.icon-btn svg, .rail-btn svg, .theme-option svg { width: calc(var(--icon-size) + 2px); height: calc(var(--icon-size) + 2px); }
 .ph-f, :is(.rail-btn.active, #settings-button[aria-expanded="true"], .theme-option[aria-pressed="true"]) .ph-r { display: none; }
 :is(.rail-btn.active, #settings-button[aria-expanded="true"], .theme-option[aria-pressed="true"]) .ph-f { display: inline; }
 :root[data-theme] .site-pill::after { content: ""; width: 12px; height: 12px; background: currentColor; -webkit-mask: var(--icon-caret) center / contain no-repeat; mask: var(--icon-caret) center / contain no-repeat; }
@@ -160,22 +168,24 @@ button { touch-action: manipulation; }
 :root[data-theme] .app-shell.fullscreen { inset: 0; width: 100%; height: 100dvh; border: 0; border-radius: 0; }
 /* One sidebar: brand, primary actions, the chat list, then settings. The nav keeps its .rail/.rail-btn hooks. */
 :root[data-theme] .sidebar { display: flex; flex-direction: column; overflow: visible; background: var(--panel-soft); border-right: 1px solid var(--line); }
-:root[data-theme] .sidebar > .panel-header { min-height: 64px; padding: var(--space-3) var(--space-2) var(--space-2) var(--space-4); border: 0; }
+/* Every panel header shares the chat header's height so their rules line up across columns. */
+:root[data-theme] .panel-header { min-height: var(--header-height); padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4); }
+:root[data-theme] .sidebar > .panel-header { border: 0; }
 :root[data-theme] .sidebar .brand-mark { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 :root[data-theme] .sidebar-brand-copy { min-width: 0; overflow: hidden; white-space: nowrap; }
-.sidebar-logo { display: grid; flex: none; place-items: center; width: 28px; height: 28px; color: var(--brand); }
-.sidebar-logo svg { width: 24px; height: 24px; }
-:root[data-theme] .sidebar h1 { font-size: var(--type-lg); line-height: 1.2; }
-#store-summary { margin-top: 2px; color: var(--muted); }
+.sidebar-logo { display: grid; flex: none; place-items: center; width: calc(var(--icon-size) + 2px); height: calc(var(--icon-size) + 2px); color: var(--brand); }
+.sidebar-logo svg { width: 100%; height: 100%; }
+:root[data-theme] .sidebar h1 { font-size: var(--type-base); line-height: 1.3; }
+#store-summary { color: var(--muted); }
 :root[data-theme] #close-chat-sidebar { display: none; }
 :root[data-theme] .sidebar .rail { display: block; padding: 0 var(--space-2) var(--space-1); border: 0; background: none; color: var(--text); }
 :root[data-theme] .sidebar .rail-actions { display: grid; gap: 2px; justify-items: stretch; padding: 0; overflow: visible; }
 :root[data-theme] .sidebar .rail-bottom { position: relative; display: block; margin-top: auto; padding: var(--space-2); border-top: 1px solid var(--line); }
 :root[data-theme] :is(.rail-btn, #settings-button) {
-  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-3);
-  width: 100%; height: auto; min-height: var(--control-height); padding: 0 var(--space-3);
+  display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2);
+  width: 100%; height: auto; min-height: var(--control-height); padding: 0 var(--space-2);
   border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text); box-shadow: none;
-  font-size: var(--type-base); transition: background-color var(--motion);
+  font-size: var(--type-ui); transition: background-color var(--motion);
 }
 :root[data-theme] :is(.rail-btn, #settings-button) svg { flex: none; color: var(--muted); }
 :root[data-theme] :is(.rail-btn, #settings-button):hover { background: var(--panel); color: var(--text); border-color: transparent; box-shadow: none; }
@@ -191,87 +201,102 @@ button { touch-action: manipulation; }
 .rail-btn[data-tooltip]::before, .rail-btn[data-tooltip]::after { display: none; }
 :root[data-theme] .sidebar-section-label { margin: var(--space-3) var(--space-4) var(--space-1); color: var(--muted); font-size: var(--type-xs); font-weight: 650; }
 /* Date groups in the chat list (Today, Yesterday, …), styled like the section label above them. */
-:root[data-theme] .chat-group-label { margin: var(--space-3) var(--space-3) var(--space-1); color: var(--muted); font-size: var(--type-xs); font-weight: 650; letter-spacing: 0; }
+:root[data-theme] .chat-group-label { margin: var(--space-3) var(--space-2) var(--space-1); color: var(--muted); font-size: var(--type-xs); font-weight: 650; letter-spacing: 0; }
 /* The date headings already say what the list is; "Chats" stays only as the list accessible name. */
 #chat-list-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.chat-list { --chat-list-row-height: 64px; flex: 1 1 auto; min-height: 0; overflow: hidden auto; padding: 0 var(--space-2) var(--space-2); max-height: none; gap: var(--space-1); }
+.chat-list { --chat-list-row-height: calc(var(--control-height) + 2 * var(--space-1)); flex: 1 1 auto; min-height: 0; overflow: hidden auto; padding: 0 var(--space-2) var(--space-2); max-height: none; gap: var(--space-1); }
 :root[data-theme] .chat-item {
-  grid-template-columns: 34px minmax(0, 1fr) var(--control-height); gap: var(--space-2);
-  border: 1px solid transparent; border-radius: var(--radius-control); padding: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) var(--control-height); gap: var(--space-2);
+  border: 1px solid transparent; border-radius: var(--radius-control); padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
   background: transparent; box-shadow: none; transition: background-color var(--motion);
 }
 :root[data-theme] .chat-item:hover { background: var(--panel); }
 :root[data-theme] .chat-item.active { background: var(--brand-deep); }
-:root[data-theme] .chat-avatar { width: 34px; height: 34px; border: 0; border-radius: var(--radius-control); background: var(--panel-strong); color: var(--brand); box-shadow: none; }
-:root[data-theme] .chat-item.active .chat-avatar { background: var(--brand); color: var(--on-brand); }
-:root[data-theme] .chat-item.has-activity .chat-avatar::after { border-color: var(--panel-soft); background: var(--brand); }
-:root[data-theme] .chat-name { color: var(--text); font-size: var(--type-base); font-weight: 650; }
+/* Text-only rows: the title alone, heavier when active; a dot after it marks unseen replies. */
+:root[data-theme] .chat-name { color: var(--text); font-size: var(--type-ui); font-weight: 400; }
+:root[data-theme] .chat-item.active .chat-name { font-weight: 600; }
+:root[data-theme] .chat-item.has-activity .chat-item-title::after { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
 .chat-name::before { content: ""; position: absolute; inset: 0; border-radius: var(--radius-control); }
 .chat-name:focus-visible::before { outline: 2px solid var(--brand); outline-offset: -2px; }
 :root[data-theme] .chat-name:focus-visible { outline: none; }
 :root[data-theme] .chat-item-side { gap: 0; justify-items: center; min-width: 0; }
-:root[data-theme] :is(.chat-time, .summary-line) { color: var(--muted); font-size: var(--type-xs); font-weight: 500; }
+:root[data-theme] :is(.chat-time, .summary-line) { color: var(--muted); font-size: var(--type-xs); font-weight: 400; }
 :root[data-theme] .chat-time { font-variant-numeric: tabular-nums; }
-:root[data-theme] .chat-menu-btn { opacity: 1; font-size: 1rem; }
+/* No font-size here: the ⋯ is the mask icon, not the text glyph. */
+:root[data-theme] .chat-menu-btn { opacity: 1; }
 :root[data-theme] .chat-action-menu { top: calc(100% - var(--space-2)); right: var(--space-2); gap: var(--space-1); padding: var(--space-1); }
 :root[data-theme] .chat-action-menu .btn-danger { color: var(--danger); }
 :root[data-theme] .chat-create { position: static; margin: var(--space-2); padding: var(--space-3); gap: var(--space-3); overflow: auto; max-height: 65dvh; border: 0; background: var(--panel); box-shadow: none; backdrop-filter: none; }
-:root[data-theme] .chat-create h2 { font-size: var(--type-base); }
+:root[data-theme] :is(.chat-create, .settings-menu) h2 { font-size: var(--type-base); }
 :root[data-theme] .chat-create-template-btn { color: var(--brand); }
+/* flex: none so the list shrinks instead of the form (which clipped Cancel/Create). */
+:root[data-theme] .chat-create { flex: none; gap: var(--space-4); padding: var(--space-4) var(--space-3) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+:root[data-theme] .chat-create .field { gap: var(--space-2); }
+:root[data-theme] .chat-create .field > label { color: var(--muted); }
+:root[data-theme] .chat-create .field legend { padding-bottom: var(--space-2); }
+:root[data-theme] .chat-create .mode-options { gap: var(--space-2); }
+:root[data-theme] .chat-create .mode-option { gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: transparent; }
+:root[data-theme] .chat-create .mode-option:hover { border-color: var(--line-strong); }
+/* Selected: brand border on a filled card (flat: the design system draws no shadows). */
+:root[data-theme] .chat-create .mode-option:has(input:checked) { border-color: var(--brand); background: var(--panel-soft); color: var(--text); }
+:root[data-theme] .chat-create .mode-option input { margin-top: 3px; }
+:root[data-theme] .chat-create .mode-name { font-size: var(--type-sm); font-weight: 600; }
+:root[data-theme] .chat-create .mode-help { margin-top: 2px; color: var(--muted); font-size: var(--type-xs); line-height: 1.4; }
+:root[data-theme] .chat-create .two-col { gap: var(--space-2); }
+:root[data-theme] .chat-create #cancel-create-chat { border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+:root[data-theme] .chat-create #cancel-create-chat:hover { border-color: var(--line-strong); }
+:root[data-theme] .chat-create-template-row { padding-top: var(--space-2); border-top: 1px solid var(--line); }
 
 :root[data-theme] .workspace { grid-column: 2; min-width: 0; min-height: 0; border: 0; background: var(--panel); overflow: visible; }
-:root[data-theme] .chat-header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); min-height: 64px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5); background: var(--panel); border-color: var(--line); }
-.chat-title-block { min-width: 0; }
-.chat-title-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
-:root[data-theme] .chat-title { min-width: 0; color: var(--text); font-size: 1.125rem; line-height: 1.3; font-weight: 650; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-:root[data-theme] .chat-subtitle { margin-top: 2px; color: var(--muted); font-size: var(--type-xs); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.chat-header > .chat-row { justify-content: flex-end; align-items: center; gap: var(--space-2); flex-wrap: nowrap; }
-/* Header actions read as one toolbar: icon + label ghost buttons, filled only on hover or while their panel is open. */
+:root[data-theme] .chat-header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); min-height: var(--header-height); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-4); background: var(--panel); border-color: var(--line); }
+/* 8rem is the least room a title needs; below that the toolbar wraps under it (a phone with 44px touch targets). */
+.chat-title-block { flex: 1 1 8rem; min-width: 0; }
+.chat-title-line { display: flex; align-items: center; gap: var(--space-2); }
+/* When the row runs out of room the status gives way first (down to its dot), then the title ellipsizes. */
+.chat-title-line > .status-pill { flex: 0 10 auto; min-width: 1.25rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.chat-title-line > .chat-title { flex: 0 1 auto; }
+:root[data-theme] .chat-title { min-width: 0; color: var(--text); font-size: var(--type-prose); line-height: 1.3; font-weight: 650; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* Mode: outlined, no dot, so it never reads as the status pill beside it. It gives way before the title. */
+.chat-title-line > .chat-mode-pill { flex: 0 5 auto; min-width: 1.25rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+:root[data-theme] .chat-mode-pill { height: 22px; padding: 0 var(--space-2); border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: var(--type-xs); font-weight: 600; line-height: 20px; }
+:root[data-theme] #chat-status { flex-shrink: 0; height: 22px; }
+/* The status is whole or a dot, never cut mid-word. The room left depends on the sidebar, toolbar labels and title, not the
+   window width, so the title block is the container: under ~8rem title + mode + full status, it keeps its dot only
+   (the text stays for screen readers and in the tooltip). */
+.chat-title-block { container-type: inline-size; }
+@container (max-width: 24rem) {
+  :root[data-theme] #chat-status { gap: 0; padding: 0 6px; font-size: 0; }
+}
+.chat-header > .chat-row { flex: none; margin-left: auto; justify-content: flex-end; align-items: center; gap: var(--space-1); flex-wrap: nowrap; }
+/* Header actions read as one toolbar: outlined icon + label buttons of one height, radius and border; filled on hover or while their panel is open. */
 :root[data-theme] .chat-header .drawer-summary {
-  display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-4) 0 var(--space-3);
-  border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--panel); color: var(--text);
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-height); padding: 0 var(--space-3) 0 var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text);
   font-size: var(--type-sm); font-weight: 600; font-variant-numeric: tabular-nums; transition: background-color var(--motion), color var(--motion);
 }
-:root[data-theme] .chat-header .drawer-summary:hover:not(:disabled) { background: var(--panel-soft); color: var(--text); }
+:root[data-theme] .chat-header :is(.drawer-summary, #restore-chat):hover:not(:disabled) { border-color: var(--line-strong); background: var(--panel-soft); color: var(--text); }
 :root[data-theme] .chat-header .drawer-summary svg { flex: none; width: var(--icon-size); height: var(--icon-size); }
 /* team.js rewrites these labels as plain text, so their icons are drawn as masks. */
 :root[data-theme] :is(#toggle-people-drawer, #toggle-notes-panel)::before { content: ""; flex: none; width: var(--icon-size); height: var(--icon-size); background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
 #toggle-notes-panel { --icon: var(--icon-notes); }
-:root[data-theme] #restore-chat:hover { background: var(--panel-soft); color: var(--text); }
-:root[data-theme] .chat-header .drawer-summary[aria-expanded="true"] { border-color: var(--brand); }
 :root[data-theme] .chat-header :is(.drawer-summary, #restore-chat):focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-/* Restore sits apart from the panel toggles: it acts on the provider sessions, not on a panel. */
+/* Restore is a square icon button in the same outline as the panel toggles. */
 /* inline-flex, not the shared inline-grid: grid gives the hidden "Restore session" text its own row and lifts the icon. */
-:root[data-theme] .chat-header #restore-chat { display: inline-flex; align-items: center; justify-content: center; position: relative; margin-left: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--panel); color: var(--text); }
-:root[data-theme] .chat-header #restore-chat:hover { background: var(--panel-soft); }
-.chat-header #restore-chat::after { content: ""; position: absolute; left: calc(-1 * var(--space-3) - 1px); top: 8px; bottom: 8px; width: 1px; background: var(--line); }
-.header-count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--brand-deep); color: var(--brand); font-size: var(--type-xs); font-weight: 650; }
+:root[data-theme] .chat-header #restore-chat { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text); }
+.header-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--space-1); border-radius: 10px; background: var(--brand-deep); color: var(--brand); font-size: var(--type-xs); font-weight: 650; }
 .header-count:empty { display: none; }
 /* team.js closes the members drawer on clicks whose target is not the toggle itself, so its decorated parts pass clicks through. */
 .chat-header .drawer-summary > * { pointer-events: none; }
-/* The chat's tile repeats its sidebar avatar so the header and the list read as the same chat. */
-.chat-header-avatar { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-panel); background: var(--brand); color: var(--on-brand); font-size: var(--type-lg); font-weight: 700; }
-.chat-header-avatar[hidden] { display: none; }
-/* Explicit columns: the tile is absent while no chat is open. */
-.chat-header-avatar { grid-column: 1; }
-.chat-header > .chat-title-block { grid-column: 2; }
-.chat-header > .chat-row { grid-column: 3; }
-:root[data-theme] .chat-header .chat-subtitle { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--space-2); margin-top: var(--space-1); }
-.chat-meta-item { display: inline-flex; align-items: center; gap: var(--space-1); }
-.chat-meta-item::before { content: ""; flex: none; width: 15px; height: 15px; background: currentColor; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
-.chat-meta-item + .chat-meta-item::after { order: -1; content: "·"; margin-right: var(--space-1); }
-.chat-meta-mode, .chat-meta-members { --icon: var(--icon-group); }
-.chat-meta-messages { --icon: var(--icon-message); }
 #toggle-people-drawer { --icon: var(--icon-group); }
-:root[data-theme] .chat-header .drawer-summary[aria-expanded="true"] { background: var(--brand-deep); color: var(--brand); }
+:root[data-theme] .chat-header .drawer-summary[aria-expanded="true"] { border-color: var(--line-strong); background: var(--brand-deep); color: var(--brand); }
 :root[data-theme] .status-pill { gap: var(--space-1); font-size: var(--type-xs); font-weight: 600; }
 :root[data-theme] .status-pill::before { margin: 0 2px 0 0; box-shadow: none; }
-:root[data-theme] #chat-status { padding: 2px var(--space-2) 2px 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); color: var(--muted); box-shadow: none; }
+:root[data-theme] #chat-status { padding: 0 var(--space-2) 0 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); color: var(--muted); box-shadow: none; }
 :root[data-theme] #chat-status:is(.status-ready, .status-running) { color: var(--success); }
 :root[data-theme] #chat-status.status-initializing { color: var(--warning); }
 :root[data-theme] #chat-status.status-error { color: var(--danger); }
 :root[data-theme] #toggle-chat-sidebar { display: none; }
-:root[data-theme] #restore-chat { min-width: var(--control-height); width: var(--control-height); border-color: transparent; color: var(--muted); }
+:root[data-theme] #restore-chat { min-width: var(--control-height); width: var(--control-height); }
 
 
 :root[data-theme] .messages, :root[data-theme] .app-shell.fullscreen .messages {
@@ -290,7 +315,7 @@ button { touch-action: manipulation; }
   background: var(--brand-deep); color: var(--brand); box-shadow: none; border: 0; font-size: var(--type-xs);
 }
 :root[data-theme] .message-name { flex-wrap: wrap; gap: var(--space-1) var(--space-2); margin: 0 0 var(--space-1); min-height: 24px; overflow: visible; color: var(--text); font-size: var(--type-base); font-weight: 650; }
-.message-name-text.mention-shortcut { display: inline-flex; align-items: center; min-height: var(--control-height); }
+.message-name-text.mention-shortcut { display: inline-flex; align-items: center; min-height: var(--control-compact); }
 :root[data-theme] .message-name .message-site-jump-btn { opacity: 1; }
 :root[data-theme] .message-bubble { background: transparent; color: var(--text); box-shadow: none; border-radius: var(--radius-panel); }
 .message-bubble::before { display: none; }
@@ -320,20 +345,30 @@ button { touch-action: manipulation; }
 :root[data-theme] .empty-card { border: 0; padding: var(--space-5) 0; box-shadow: none; background: transparent; color: var(--muted); }
 :root[data-theme] .empty-state .empty-card h3 { color: var(--text); font-size: var(--type-title); }
 :root[data-theme] .empty-card :is(p, button) { margin-top: var(--space-2); }
+/* No members yet: illustration, title, one line, one action. */
+:root[data-theme] .empty-card-people { display: grid; justify-items: center; max-width: 22rem; padding-top: 0; text-align: center; }
+.empty-illustration { width: 168px; margin-bottom: var(--space-4); }
+.empty-illustration svg { display: block; width: 100%; height: auto; }
+.empty-illustration .links { fill: none; stroke: color-mix(in srgb, var(--line-strong) 55%, transparent); stroke-width: 1; }
+.empty-illustration .node circle { fill: var(--panel-soft); stroke: var(--line-strong); stroke-width: 1; }
+.empty-illustration .node use { fill: var(--muted); }
+.empty-illustration .node-center circle { fill: var(--brand-deep); stroke: var(--brand); }
+.empty-illustration .node-center use { fill: var(--text); }
+:root[data-theme] .empty-card-people .btn-primary { min-width: 96px; margin-top: var(--space-4); padding-inline: var(--space-5); }
 
 :root[data-theme] .composer {
-  /* One pill: attach on the left, the draft in the middle, auto-reply and send on the right. No hint line: only attachment errors show below. */
+  /* One row: attach on the left, the draft in the middle, auto-reply and send on the right. No hint line: only attachment errors show below. */
   --composer-pad: 6px;
   position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: end;
   grid-template-areas: "ref ref ref ref" "files files files files" "attach input toggle send" "feedback feedback feedback feedback";
   gap: 0 var(--space-1); width: min(calc(100% - 2 * var(--space-5)), var(--conversation));
   margin: 0 auto var(--space-4); padding: var(--composer-pad);
-  border: 1px solid var(--line-strong); border-radius: calc(var(--control-height) / 2 + var(--composer-pad)); background: var(--panel); box-shadow: none;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-panel); background: var(--panel); box-shadow: none;
 }
 :root[data-theme] .composer .reference-draft { grid-area: ref; margin-bottom: var(--space-1); }
 :root[data-theme] .composer:focus-within { border-color: var(--brand); }
 :root[data-theme] .composer-input { grid-area: input; display: grid; min-width: 0; }
-:root[data-theme] #message-input { min-height: var(--control-height); max-height: min(200px, 30dvh); padding: 10px var(--space-1); border: 0; background: transparent; color: var(--text); outline: none; resize: none; field-sizing: content; font-size: var(--type-prose); }
+:root[data-theme] #message-input { min-height: var(--control-height); max-height: min(200px, 30dvh); padding: calc((var(--control-height) - 1.5em) / 2) var(--space-2); border: 0; background: transparent; color: var(--text); outline: none; resize: none; field-sizing: content; font-size: var(--type-prose); }
 /* @mentions are coloured by a mirror layer drawn under the textarea; JS adds .has-mirror once it is in sync. */
 :root[data-theme] .composer-input > * { grid-area: 1 / 1; }
 .message-input-mirror { display: none; }
@@ -348,9 +383,8 @@ button { touch-action: manipulation; }
 :root[data-theme] .composer-tools .manual-mention-toggle { grid-area: toggle; }
 :root[data-theme] .composer-actions { grid-area: send; position: static; margin: 0; gap: var(--space-2); }
 :root[data-theme] .composer-feedback { display: none; grid-area: feedback; padding: 0 var(--space-3) var(--space-1); overflow-wrap: anywhere; }
-:root[data-theme] .composer-tools .btn { min-height: var(--control-height); padding-inline: var(--space-2); border-color: transparent; border-radius: calc(var(--control-height) / 2); color: var(--muted); }
+:root[data-theme] .composer-tools .btn { min-height: var(--control-height); padding-inline: var(--space-2); border-color: transparent; color: var(--muted); }
 :root[data-theme] .composer-tools .btn:hover { background: var(--panel-soft); color: var(--text); }
-:root[data-theme] #attach-file { border-radius: 50%; }
 :root[data-theme] .composer-tools .manual-mention-toggle { padding-left: calc(28px + 2 * var(--space-2)); }
 /* The switch itself shows on/off; the button around it stays frameless in every state. */
 :root[data-theme] .composer-tools .manual-mention-toggle:is(*, :hover, [aria-pressed="true"]) { border-color: transparent; background: transparent; }
@@ -359,7 +393,13 @@ button { touch-action: manipulation; }
 :root[data-theme] .manual-mention-toggle::after { left: calc(var(--space-2) + 2px); width: 12px; height: 12px; background: var(--panel); transition: transform var(--motion); }
 :root[data-theme] .manual-mention-toggle[aria-checked="true"]::before { background: var(--brand); }
 :root[data-theme] .manual-mention-toggle[aria-checked="true"]::after { transform: translateX(12px); background: var(--on-brand); }
-:root[data-theme] #send-message { width: var(--control-height); height: var(--control-height); padding: 0; border-radius: 50%; }
+/* Locked until the chat has members: muted surface, lock in place of the paperclip, every control disabled. */
+:root[data-theme] .composer.is-locked { border-color: var(--line); background: var(--panel-soft); }
+:root[data-theme] .composer.is-locked #message-input { cursor: not-allowed; }
+:root[data-theme] .composer.is-locked #attach-file svg { display: none; }
+:root[data-theme] .composer.is-locked #attach-file::before { content: ""; width: var(--icon-size); height: var(--icon-size); background: currentColor; -webkit-mask: var(--icon-lock) center / contain no-repeat; mask: var(--icon-lock) center / contain no-repeat; }
+:root[data-theme] .composer.is-locked #attach-file:disabled { opacity: 1; }
+:root[data-theme] #send-message { width: var(--control-height); height: var(--control-height); padding: 0; }
 #send-message::before { display: none; }
 /* Send-target and busy hints stay in the DOM as the draft's aria description, but are never shown. */
 :root[data-theme] :is(#target-preview, #busy-preview) { display: none; }
@@ -374,11 +414,11 @@ button { touch-action: manipulation; }
   color: var(--text); box-shadow: var(--shadow); backdrop-filter: none;
 }
 :root[data-theme] .settings-menu {
-  left: var(--space-2); bottom: calc(100% + var(--space-1)); width: 304px;
+  left: var(--space-2); bottom: calc(100% + var(--space-1)); width: calc(var(--sidebar-width) - 2 * var(--space-2));
   max-width: calc(100vw - 2 * var(--space-2)); max-height: calc(100dvh - 96px); overflow: auto;
-  padding: var(--space-4); z-index: 34;
+  padding: var(--space-3); z-index: 34;
 }
-.settings-menu h2 { margin-bottom: var(--space-3); }
+.settings-menu h2 { margin-bottom: var(--space-2); }
 :root[data-theme] .settings-label { font-size: var(--type-xs); font-weight: 650; color: var(--muted); }
 :root[data-theme] :is(.theme-switch, .settings-segment, .template-type-tabs, .note-scope-tabs) {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1);
@@ -397,7 +437,8 @@ button { touch-action: manipulation; }
 :root[data-theme] .role-panel:not(.open) { display: none; }
 :root[data-theme] .role-panel.open { visibility: visible; z-index: 33; }
 .role-panel .panel-header > div:first-child { min-width: 0; }
-:root[data-theme] .role-panel .panel-header h2 { font-size: var(--type-lg); }
+#role-summary { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+:root[data-theme] :is(.role-panel, .notes-panel) .panel-header h2 { font-size: var(--type-lg); }
 :root[data-theme] .role-panel-actions { gap: var(--space-1); }
 :root[data-theme] .role-scroll { flex: 1; padding: var(--space-3) var(--space-4); overflow: auto; overscroll-behavior: contain; }
 :root[data-theme] :is(.role-card, .template-card, .select-row) { padding: var(--space-3) 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
@@ -412,8 +453,9 @@ button { touch-action: manipulation; }
 :root[data-theme] .role-card-actions svg { width: var(--icon-size); height: var(--icon-size); }
 :root[data-theme] .role-card-actions button:hover { background: var(--panel-soft); color: var(--text); }
 :root[data-theme] .role-card-actions .role-delete:hover { background: var(--danger-bg); color: var(--danger); }
-:root[data-theme] :is(.role-name, .template-name) { font-size: var(--type-base); font-weight: 660; }
+:root[data-theme] :is(.role-name, .template-name) { font-size: var(--type-base); font-weight: 650; }
 :root[data-theme] :is(.role-description, .template-description, .role-meta-item) { font-size: var(--type-xs); color: var(--muted); overflow-wrap: anywhere; }
+:root[data-theme] :is(.role-meta-item, .all-note-target-meta, .orchestration-template-summary, .orchestration-template-structure, .orchestration-template-tags, .pagination-label) { font-weight: 400; }
 :root[data-theme] .role-avatar { width: var(--control-height); height: var(--control-height); }
 :root[data-theme] #add-role-form { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: var(--panel); padding: var(--space-3) var(--space-4); }
 :root[data-theme] #add-role-form .btn { justify-self: start; }
@@ -422,7 +464,7 @@ button { touch-action: manipulation; }
 :root[data-theme] .add-person-site-option { opacity: 1; }
 :root[data-theme] .add-person-site-option.active, :root[data-theme] .role-site-option.active { background: var(--brand-deep); color: var(--brand); box-shadow: none; }
 :root[data-theme] .add-person-site-option.disabled { opacity: .55; }
-.template-card-body:has(.profile-avatar) { display: grid; grid-template-columns: var(--control-height) minmax(0, 1fr); column-gap: var(--space-3); }
+.template-card-body:has(.profile-avatar) { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-3); }
 .template-card-body > .profile-avatar { grid-column: 1; grid-row: 1 / span 4; }
 .template-card-body:has(.profile-avatar) > :not(.profile-avatar) { grid-column: 2; min-width: 0; }
 .template-card-actions { flex-wrap: wrap; }
@@ -476,12 +518,13 @@ button { touch-action: manipulation; }
 :root[data-theme] .site-segment { min-height: var(--control-height); }
 :root[data-theme] :is(.mode-option, .site-segment):has(input:checked) { border-color: var(--brand); background: var(--brand-deep); color: var(--brand); }
 :root[data-theme] :is(.site-segment, .add-person-site-option):has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: -2px; }
-:root[data-theme] .mode-help { color: var(--muted); font-size: var(--type-xs); }
+:root[data-theme] .mode-name { font-size: var(--type-sm); font-weight: 600; }
+:root[data-theme] .mode-help { color: var(--muted); font-size: var(--type-xs); font-weight: 400; }
 :root[data-theme] #people-library-modal .modal { width: min(760px, 100%); }
 :root[data-theme] .people-library-toolbar { margin-bottom: var(--space-2); }
 .people-library-pane .section-title { margin-top: 0; }
 :root[data-theme] :is(.group-template-categories, .template-category-filter) { flex-wrap: nowrap; overflow-x: auto; padding: var(--space-1); margin-inline: calc(-1 * var(--space-1)); scrollbar-width: thin; }
-:root[data-theme] :is(.group-template-category-filter, .template-category-chip) { flex: 0 0 auto; border: 1px solid transparent; border-radius: var(--radius-control); padding-inline: var(--space-3); background: var(--panel-soft); color: var(--muted); }
+:root[data-theme] :is(.group-template-category-filter, .template-category-chip) { flex: 0 0 auto; border: 1px solid transparent; border-radius: var(--radius-control); padding: 0 var(--space-3); background: var(--panel-soft); color: var(--muted); }
 :root[data-theme] :is(.group-template-category-filter, .template-category-chip):is(:hover, .active) { background: var(--brand-deep); color: var(--brand); }
 :root[data-theme] :is(.group-template-category-filter, .template-category-chip, .group-template-option):focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 :root[data-theme] .group-template-modal { width: min(1080px, 100%); min-height: 0; height: min(820px, calc(100dvh - 2 * var(--space-4))); }
@@ -507,14 +550,15 @@ button { touch-action: manipulation; }
 :root[data-theme] .site-segmented { gap: var(--space-1); }
 :root[data-theme] .site-segment span { color: inherit; }
 
-:root[data-theme] .notes-panel { max-height: calc(100dvh - 72px - var(--space-2)); }
+/* Hangs one gap under the header and stops one gap above the window's bottom edge, whatever the header height. */
+:root[data-theme] .notes-panel { top: calc(var(--header-height) + var(--space-2)); max-height: calc(100dvh - var(--header-height) - 2 * var(--space-2)); }
 :root[data-theme] .note-scope-tabs { margin: var(--space-2) var(--space-3) 0; }
-:root[data-theme] .note-scope-tab { padding: var(--space-2) var(--space-3); }
+:root[data-theme] .note-scope-tab { padding: 0 var(--space-3); }
 :root[data-theme] .note-toolbar { gap: 0; padding: var(--space-2); border-color: var(--line); background: var(--panel-soft); }
 :root[data-theme] .note-tool-btn { height: var(--control-compact); min-width: var(--control-compact); min-height: 0; font-weight: 650; }
 :root[data-theme] .notes-editor { padding: var(--space-4); color: var(--text); font-size: var(--type-prose); }
 :root[data-theme] .notes-editor .ProseMirror:focus-visible { outline: none; }
-:root[data-theme] .notes-editor:has(.ProseMirror:focus-visible) { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: var(--radius-control); }
+:root[data-theme] .notes-editor:has(.ProseMirror:focus-visible) { outline: 1px solid var(--line-strong); outline-offset: -1px; border-radius: var(--radius-control); }
 .notes-editor .ProseMirror > p:only-child:has(> br:only-child)::before {
   content: "Write a note…"; position: absolute; color: var(--muted); pointer-events: none;
 }
@@ -561,8 +605,8 @@ button { touch-action: manipulation; }
   background: var(--panel-soft); border-radius: var(--radius-control); overflow-wrap: anywhere;
 }
 :root[data-theme] .orchestration-empty-hint { width: min(300px, calc(100% - var(--space-5))); padding: var(--space-2); border: 0; background: var(--panel-soft); color: var(--muted); }
-:root[data-theme] .orchestration-footer { grid-template-columns: minmax(0, 196px) minmax(0, 1fr) auto; gap: var(--space-3); }
-:root[data-theme] .orchestration-rounds-field { grid-template-columns: minmax(0, 1fr) 64px; }
+:root[data-theme] .orchestration-footer { grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); }
+:root[data-theme] .orchestration-rounds-field { grid-template-columns: auto 64px; }
 :root[data-theme] :is(.orchestration-template-modal, .orchestration-auto-modal) { width: min(760px, 100%); gap: var(--space-2); }
 :root[data-theme] .orchestration-template-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 :root[data-theme] .orchestration-template-card { border: 1px solid transparent; border-radius: var(--radius-control); background: var(--panel-soft); color: var(--text); box-shadow: none; }
@@ -633,32 +677,28 @@ button { touch-action: manipulation; }
   }
   :root[data-theme] .workspace { grid-column: 1; }
   :root[data-theme] .sidebar {
-    position: absolute; inset: 0 auto 0 0; z-index: 31; width: min(300px, calc(100% - 48px));
+    position: absolute; inset: 0 auto 0 0; z-index: 31; width: min(var(--sidebar-width), calc(100% - 48px));
     transform: translateX(-100%); visibility: hidden;
     transition: transform var(--motion-panel), visibility var(--motion-panel);
   }
   :root[data-theme] .chat-sidebar-open .sidebar { transform: none; visibility: visible; }
   :root[data-theme] :is(#toggle-chat-sidebar, #close-chat-sidebar) { display: inline-grid; }
   :root[data-theme] #collapse-sidebar { display: none; }
-  :root[data-theme] .chat-header { grid-template-columns: var(--control-height) auto minmax(0, 1fr) auto; padding-inline: var(--space-3); }
-  .chat-header-avatar { grid-column: 2; }
-  .chat-header > .chat-title-block { grid-column: 3; }
-  .chat-header > .chat-row { grid-column: 4; }
+  :root[data-theme] .chat-header { padding-inline: var(--space-3); }
   :root[data-theme] .window-resize-handle { display: none; }
   :root[data-theme] .orchestration-layout { grid-template-columns: 152px minmax(0, 1fr) 208px; }
   :root[data-theme] .orchestration-layout.settings-hidden { grid-template-columns: 152px minmax(0, 1fr); }
 }
 @media (max-width: 720px) {
-  :root[data-theme] .chat-header { grid-template-columns: var(--control-height) auto minmax(0, 1fr); padding: var(--space-2) var(--space-3); gap: var(--space-2); }
-  .chat-header-avatar { width: 32px; height: 32px; font-size: var(--type-base); }
-  .chat-header > .chat-row { grid-column: 1 / -1; justify-content: flex-start; }
-  :root[data-theme] .chat-header .drawer-summary { padding-inline: var(--space-2); }
-  :root[data-theme] .chat-title { font-size: 1.0625rem; }
+  /* Header buttons drop to icon (+ count) here; labels stay as their accessible names. */
+  :root[data-theme] .chat-header .drawer-summary { min-width: var(--control-height); padding: 0 var(--space-2); justify-content: center; }
+  :is(#open-orchestration > span, .chat-header .header-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   :root[data-theme] .messages, :root[data-theme] .app-shell.fullscreen .messages { padding: var(--space-3); gap: var(--space-4); }
   :root[data-theme] .message-inner, :root[data-theme] .app-shell.fullscreen .message-inner { gap: var(--space-2); }
   :root[data-theme] .message-row.user .message-inner { max-width: 95%; }
+  /* Keeps prose columns readable on a phone; the table scrolls sideways. */
+  :root[data-theme] .message-body.markdown-body :is(th, td) { min-width: 9em; }
   :root[data-theme] .composer { width: calc(100% - 2 * var(--space-3)); margin-bottom: var(--space-2); }
-  :root[data-theme] #message-input { min-height: var(--control-height); font-size: 1rem; }
   :root[data-theme] .modal-backdrop { padding: var(--space-2); }
   :root[data-theme] .modal { padding: var(--space-3); max-height: calc(100dvh - 2 * var(--space-2)); }
   :root[data-theme] .modal-close { top: var(--space-2); right: var(--space-2); }
@@ -669,7 +709,7 @@ button { touch-action: manipulation; }
   :root[data-theme] .select-row { grid-template-columns: auto minmax(0, 1fr); }
   :root[data-theme] .select-row .add-person-site-control { grid-column: 2; justify-content: flex-start; }
   :root[data-theme] .site-segmented { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  :root[data-theme] .notes-panel.open { inset: var(--space-2) var(--space-2) 68px !important; width: auto !important; height: auto !important; }
+  :root[data-theme] .notes-panel.open { inset: var(--space-2) var(--space-2) calc(var(--control-height) + var(--space-5)) !important; width: auto !important; height: auto !important; }
   :root[data-theme] .notes-resize-handle { display: none; }
   :root[data-theme] .all-notes-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   :root[data-theme] .all-notes-list { overflow-x: auto; }
@@ -689,10 +729,7 @@ button { touch-action: manipulation; }
   :root[data-theme] .orchestration-auto-modal { min-height: 0; }
 }
 @media (max-width: 480px) {
-  :root[data-theme] .chat-header .chat-subtitle { display: none; }
-  /* Header buttons drop to icon (+ count) here; labels stay as their accessible names. */
-  :root[data-theme] .chat-header .drawer-summary { min-width: var(--control-height); padding: 0 var(--space-3); justify-content: center; }
-  :is(#open-orchestration > span, .chat-header .header-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  :root[data-theme] .composer.is-locked #message-input:placeholder-shown { white-space: normal; }
   /* Too narrow for four controls in one row: auto-reply moves under the draft. */
   :root[data-theme] .composer { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ref ref ref" "files files files" "attach input send" "feedback feedback feedback" "toggle toggle toggle"; }
   :root[data-theme] .composer-tools .manual-mention-toggle { justify-self: start; }
@@ -707,7 +744,7 @@ button { touch-action: manipulation; }
 
 /* Composer attachments: paperclip beside @, chips above the draft, the same chips under a sent message. */
 :root[data-theme] #attach-file { grid-area: attach; width: var(--control-height); padding: 0; }
-:root[data-theme] #attach-file svg { width: 18px; height: 18px; }
+:root[data-theme] #attach-file svg { width: calc(var(--icon-size) + 2px); height: calc(var(--icon-size) + 2px); }
 :root[data-theme] #attach-file.has-files { color: var(--brand); }
 .composer-files, .message-files { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 /* One scrolling row, padded so the corner remove dots are not clipped. */
@@ -741,7 +778,7 @@ button { touch-action: manipulation; }
 :root[data-theme] .file-viewer { position: fixed; inset: 0 0 0 auto; z-index: 35; display: grid; grid-template-rows: auto minmax(0, 1fr); width: 100%; border-left: 1px solid var(--line); background: var(--panel); box-shadow: -2px 0 6px #0000001a; color: var(--text); }
 .file-viewer[hidden] { display: none; }
 /* Same height as .chat-header so the two header rules line up across the split. */
-.file-viewer-header { box-sizing: border-box; min-height: 64px; display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); }
+.file-viewer-header { box-sizing: border-box; min-height: var(--header-height); display: flex; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-bottom: 1px solid var(--line); }
 .file-viewer-heading { flex: 1; min-width: 0; }
 :root[data-theme] .file-viewer-title { margin: 0; overflow: hidden; font-size: var(--type-lg); text-overflow: ellipsis; white-space: nowrap; }
 :root[data-theme] .file-viewer-meta { margin: 0; color: var(--muted); font-size: var(--type-xs); }
@@ -758,7 +795,6 @@ button { touch-action: manipulation; }
   /* The chat column is narrow beside a file: header buttons go icon-only (as at 480px) and the details stay on one line. */
   :root[data-theme].file-viewer-open .chat-header .drawer-summary { min-width: var(--control-height); padding: 0 var(--space-3); justify-content: center; }
   :root[data-theme].file-viewer-open :is(#open-orchestration > span, .chat-header .header-label) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  :root[data-theme].file-viewer-open .chat-header .chat-subtitle { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
   :root[data-theme].file-viewer-open .app-shell { width: calc(100% - var(--file-viewer-width)); left: calc(50% - var(--file-viewer-width) / 2); }
 }
 .file-viewer-body > :is(img, video) { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -782,7 +818,9 @@ button { touch-action: manipulation; }
 :root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) pre { padding: var(--space-3) var(--space-4); border-radius: var(--radius-control); overflow-x: auto; }
 :root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; font-size: var(--type-sm); }
 :root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) :is(th, td) { padding: var(--space-2) var(--space-3); border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; vertical-align: top; }
-:root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) th { font-weight: 650; }
+/* Cells never split a word: a table too wide for the column scrolls sideways instead. */
+:root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) :is(th, td) { overflow-wrap: normal; word-break: normal; }
+:root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) th { color: var(--muted); font-size: var(--type-xs); font-weight: 600; white-space: nowrap; }
 /* DOCX cells wrap their text in <p>; drop its paragraph gap so rows stay compact. */
 :root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) :is(th, td) > p { margin: 0; }
 :root[data-theme] :is(.file-viewer-markdown, .message-body.markdown-body) a { color: var(--mention); }
@@ -797,7 +835,11 @@ button { touch-action: manipulation; }
 .ui-tooltip { position: fixed; z-index: 200; top: 0; left: 0; max-width: min(280px, calc(100vw - 8px)); padding: 6px 10px; border-radius: var(--radius-control); background: var(--text); color: var(--panel); font-size: var(--type-xs); font-weight: 600; line-height: 1.35; pointer-events: none; opacity: 0; transition: opacity var(--motion); }
 .ui-tooltip.visible { opacity: 1; }
 
-@media (pointer: coarse) { :root[data-theme] .message-avatar { --avatar-size: var(--control-height); } }
+@media (pointer: coarse) {
+  :root[data-theme] .message-avatar { --avatar-size: var(--control-height); }
+  /* 16px keeps mobile browsers from zooming the page when the draft is focused. */
+  :root[data-theme] #message-input { font-size: 1rem; }
+}
 /* Chat answers share the document typography above: one heading scale, ruled tables, the same code and quote styles. */
 :root[data-theme] .message-body.markdown-body > :first-child { margin-top: 0; }
 :root[data-theme] .message-body.markdown-body > :last-child { margin-bottom: 0; }

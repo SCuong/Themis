@@ -1,5 +1,5 @@
 import { extractSupportedConversationId, normalizeSupportedChatConversationUrl } from '../group/conversationUrl'
-import { readMessageFiles, filesAsPromptText } from './messageFiles'
+import { addFilesToDelivery, filesAsPromptText, loadMessageFiles, readMessageFiles } from './messageFiles'
 import { syncConversation, type ConversationChangeSource } from './promptSync'
 import { normalizeMessageHighlightColor } from '../group/highlightColors'
 import { defaultMentionTargetForMessage, parseGroupMentions, roleMentionLabelOptionsFromSettings } from '../group/mentionParser'
@@ -7,6 +7,7 @@ import { mapRuntimeRoleStatus } from '../group/runtimeProtocol'
 import type { BackgroundToRoleMessage } from '../group/runtimeProtocol'
 import type { ExternalModelConfig, GroupChat, GroupMessage, GroupRole, MessageImageAttachment, MessageReference, OpenTeamStore, ReplyImageSource, RuntimeFrameBinding } from '../group/types'
 import { createExternalModelClient, type ExternalModelClient } from './externalModelClient'
+import { imageDownloadSite } from './imageAttachments'
 import type { BackgroundMessageRoute } from './messageRouter'
 import type { PromptDelivery, PromptSender } from './promptDelivery'
 import { DEFAULT_PROMPT_DELIVERY_RETRY_DELAYS_MS, sendPromptDeliveryWithRetry } from './promptDeliveryRetry'
@@ -237,13 +238,15 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     const timestamp = deps.now()
     let discardedAttachmentIds: string[] = []
 
-    const { store, result } = await mutateStore(store => {
+    const { store, result } = await mutateStore(async store => {
       const chat = requireChat(store, chatId)
       const role = requireRole(store, chat.id, roleId)
       const requestedMessageId = readOptionalString(message.messageId)
       const retryTarget = resolveRetryTarget(store, chat, role, requestedMessageId, deps.log)
       const userMessage = retryTarget?.userMessage
       if (!userMessage) throw new Error(requestedMessageId ? 'This message was not sent to this member' : 'No user message available to retry')
+      // Before any change: a missing file throws here, and a throw leaves the store as it was.
+      const files = await loadMessageFiles(userMessage.files)
       if (retryTarget?.discardMessageId) {
         discardedAttachmentIds = readyAttachmentIds(store.messagesById[retryTarget.discardMessageId]?.attachments)
         discardMessage(store, chat, retryTarget.discardMessageId)
@@ -263,6 +266,7 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
       role.updatedAt = timestamp
       chat.status = 'running'
       chat.updatedAt = timestamp
+      addFilesToDelivery(prepared, files)
       return prepared
     })
 
@@ -559,9 +563,8 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
   const handleRoleReply = async (message: RuntimeMessage, sender: chrome.runtime.MessageSender) => {
     const identity = readIdentity(deps, message, sender)
     const content = readReplyContent(message.content)
-    const images = readReplyImageSources(message.images)
+    const images = readMemberImages(deps, identity, message, sender)
     if (!content && images.length === 0) throw new Error('Response content cannot be empty')
-    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('Image responses can only come from a linked ChatGPT page')
     const contentFormat = message.contentFormat === 'markdown' ? 'markdown' : undefined
     const promptMessageId = readOptionalString(message.messageId)
     const replyAttemptId = readOptionalString(message.replyAttemptId)
@@ -644,9 +647,8 @@ export function createMessageHandlers(deps: MessageHandlersDependencies): Backgr
     const identity = readIdentity(deps, message, sender)
     const messageId = requireString(message.messageId, 'Missing message ID')
     const content = readReplyContent(message.content)
-    const images = readReplyImageSources(message.images)
+    const images = readMemberImages(deps, identity, message, sender)
     if (!content && images.length === 0) throw new Error('Response content cannot be empty')
-    if (images.length > 0 && !isBoundChatGptSender(deps, identity, message, sender)) throw new Error('Image responses can only come from a linked ChatGPT page')
     const contentFormat = message.contentFormat === 'markdown' ? 'markdown' : undefined
     const timestamp = deps.now()
     const attachments = images.length > 0
@@ -892,7 +894,7 @@ async function prepareRoleErrorRetry(
   if (usedRetries >= retryDelays.length) return undefined
 
   const timestamp = deps.now()
-  const { store, result } = await mutateStore(store => {
+  const { store, result } = await mutateStore(async store => {
     const chat = requireChat(store, chatId)
     const role = requireRole(store, chat.id, roleId)
     const staleReason = staleReplyReason(store, chat, role, promptMessageId, replyAttemptId)
@@ -901,6 +903,12 @@ async function prepareRoleErrorRetry(
     if (!isUserMessageForRole(userMessage, chat, role)) return undefined
     if (userMessage.deliveryStatus?.[role.id] !== 'sent') return undefined
     if (hasAssistantReplyAfterPrompt(store, chat, role, promptMessageId)) return undefined
+    // No automatic retry without the files: the member then shows the error, and Retry names the missing file.
+    const files = await loadMessageFiles(userMessage.files).catch(error => {
+      deps.log.warn('role-error:retry-skipped-missing-files', { chatId, roleId, messageId: promptMessageId, error: error instanceof Error ? error.message : String(error) })
+      return undefined
+    })
+    if (!files) return undefined
 
     const roles = getChatRoles(store, chat)
     const messages = getChatMessages(store, chat)
@@ -921,6 +929,7 @@ async function prepareRoleErrorRetry(
     role.updatedAt = timestamp
     chat.status = 'running'
     chat.updatedAt = timestamp
+    addFilesToDelivery(prepared, files)
     return prepared
   })
 
@@ -1581,6 +1590,8 @@ function readReplyImageSources(value: unknown): ReplyImageSource[] {
     const height = readOptionalImageDimension(item.height)
     return [{
       sourceUrl: item.sourceUrl.trim(),
+      // Base64 of at most 25 MB; imageAttachments checks the declared type and the decoded size again.
+      ...(typeof item.dataUrl === 'string' && item.dataUrl.startsWith('data:image/') && item.dataUrl.length <= 36_000_000 ? { dataUrl: item.dataUrl } : {}),
       ...(typeof item.alt === 'string' && item.alt.trim() ? { alt: item.alt.trim().slice(0, 500) } : {}),
       ...(width ? { width } : {}),
       ...(height ? { height } : {}),
@@ -1592,27 +1603,43 @@ function readOptionalImageDimension(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 20_000 ? value : undefined
 }
 
-function isChatGptSenderUrl(value: string | undefined): boolean {
-  if (!value) return false
+function senderSite(value: string | undefined): 'chatgpt' | 'gemini' | undefined {
+  if (!value) return undefined
   try {
     const url = new URL(value)
-    return url.protocol === 'https:' && (url.hostname === 'chatgpt.com' || url.hostname === 'chat.openai.com')
+    if (url.protocol !== 'https:') return undefined
+    if (url.hostname === 'chatgpt.com' || url.hostname === 'chat.openai.com') return 'chatgpt'
+    return url.hostname === 'gemini.google.com' ? 'gemini' : undefined
   } catch {
-    return false
+    return undefined
   }
 }
 
-function isBoundChatGptSender(
+// Image bytes a member's page read itself are content, like its text. An image URL is downloaded here (with the
+// browser's cookies) only for the linked frame of the site that serves it; other link-only images are dropped, never
+// the reply text.
+function readMemberImages(
   deps: MessageHandlersDependencies,
   identity: { chatId: string; roleId: string },
   message: RuntimeMessage,
   sender: chrome.runtime.MessageSender,
-): boolean {
-  if (!isChatGptSenderUrl(sender.url)) return false
+): ReplyImageSource[] {
+  const images = readReplyImageSources(message.images)
+  const site = images.some(image => !image.dataUrl) ? boundSenderSite(deps, identity, message, sender) : undefined
+  return images.filter(image => image.dataUrl || (site && imageDownloadSite(image.sourceUrl) === site))
+}
+
+function boundSenderSite(
+  deps: MessageHandlersDependencies,
+  identity: { chatId: string; roleId: string },
+  message: RuntimeMessage,
+  sender: chrome.runtime.MessageSender,
+): 'chatgpt' | 'gemini' | undefined {
+  const site = senderSite(sender.url)
   const tabId = messageTabId(message, sender)
-  if (tabId === undefined) return false
+  if (!site || tabId === undefined) return undefined
   const binding = deps.runtimeFrames.getByAddress(tabId, senderFrameId(sender))
-  return Boolean(binding?.ready && binding.chatId === identity.chatId && binding.roleId === identity.roleId)
+  return binding?.ready && binding.chatId === identity.chatId && binding.roleId === identity.roleId ? site : undefined
 }
 
 function requireImageAttachmentService(deps: MessageHandlersDependencies): NonNullable<MessageHandlersDependencies['imageAttachments']> {

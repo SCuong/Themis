@@ -1,4 +1,5 @@
 import type { ReplyImageSource } from '../../group/types'
+import { extractResponseImages } from './responseImages'
 import type { ChatSiteAdapter, ConversationSnapshot, SiteStatusInfo } from './types'
 import { keepDeepestResponseContainers } from '../responseContainers'
 import { readResponseTextFromCopyAction } from './clipboardCopy'
@@ -98,9 +99,9 @@ export function createChatGptAdapter(options: ChatGptAdapterOptions = {}): ChatS
     getResponseContainers,
     getAllAssistantReplies,
     readResponseText: extractCleanText,
-    readResponseImages: extractResponseImages,
+    readResponseImages: readGeneratedImages,
     readResponseTextFromCopy: node => readResponseTextFromCopy(node, clipboardTimeoutMs, clipboardPollMs),
-    readResponseMarkdown: extractMarkdownFromDom,
+    readResponseMarkdown: readChatGptMarkdown,
     findResponseContainer,
     isGenerating: isChatGptGenerating,
     checkStatus: checkChatGptStatus,
@@ -268,60 +269,31 @@ function findPrimaryResponseInTurn(turn: Element): Element | null {
 }
 
 function isGeneratedImageResponse(element: Element): boolean {
-  return extractResponseImages(element).length > 0
+  return readGeneratedImages(element).length > 0
 }
 
 function isReportableScreenshotResponse(element: Element): boolean {
   return isGeneratedImageResponse(element) || Boolean(extractCleanText(element).trim())
 }
 
-function extractResponseImages(node: Node): ReplyImageSource[] {
-  const scope = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
-  if (!scope) return []
-
-  const bySourceUrl = new Map<string, ReplyImageSource>()
-  for (const image of scope.querySelectorAll<HTMLImageElement>(CHATGPT_SELECTORS.generatedImage)) {
-    const sourceUrl = normalizeGeneratedImageUrl(image.currentSrc || image.src)
-    if (!sourceUrl) continue
-
-    const current = bySourceUrl.get(sourceUrl)
-    const candidate: ReplyImageSource = {
-      sourceUrl,
-      ...(image.alt.trim() ? { alt: image.alt.trim() } : {}),
-      ...readImageDimensions(image),
-    }
-    bySourceUrl.set(sourceUrl, mergeImageCandidate(current, candidate))
-  }
-
-  return [...bySourceUrl.values()]
+// An interactive view (a sandboxed iframe app, live DOM Nov 2026) sits beside the caption and cannot be read from
+// here; the reply names it so the chat shows it exists.
+function readChatGptMarkdown(node: Node): string {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
+  const exchange = element?.closest('[data-turn-key]')
+  const interactive = exchange?.querySelector('iframe[src*=".web-sandbox.oaiusercontent.com"]')
+  return [extractMarkdownFromDom(node), interactive ? '🧩 interactive view' : ''].filter(Boolean).join('\n\n')
 }
 
-function normalizeGeneratedImageUrl(value: string): string | undefined {
-  try {
-    const url = new URL(value, location.href)
-    return url.protocol === 'https:' ? url.href : undefined
-  } catch {
-    return undefined
-  }
-}
-
-function readImageDimensions(image: HTMLImageElement): Pick<ReplyImageSource, 'width' | 'height'> {
-  const width = image.naturalWidth || image.width
-  const height = image.naturalHeight || image.height
-  return {
-    ...(width > 0 ? { width } : {}),
-    ...(height > 0 ? { height } : {}),
-  }
-}
-
-function mergeImageCandidate(current: ReplyImageSource | undefined, candidate: ReplyImageSource): ReplyImageSource {
-  if (!current) return candidate
-  return {
-    sourceUrl: current.sourceUrl,
-    alt: current.alt ?? candidate.alt,
-    width: current.width ?? candidate.width,
-    height: current.height ?? candidate.height,
-  }
+// The image gallery sits beside the caption, not inside it. Live DOM (Nov 2026): div[data-turn-key] groups the user row,
+// the gallery row and the caption row; there only gallery images count, never the user's own uploads in that turn.
+// Older layouts: one section[data-turn="assistant"] per reply.
+function readGeneratedImages(node: Node): ReplyImageSource[] {
+  const element = node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement
+  const exchange = element?.closest('[data-turn-key]')
+  // figure img: charts from code (figure > button "Expand chart" > img, a data: PNG).
+  if (exchange) return extractResponseImages(exchange, '[data-testid="generated-image-gallery"] img, figure img')
+  return extractResponseImages(element?.closest(CHATGPT_SELECTORS.turn) ?? node, CHATGPT_SELECTORS.generatedImage)
 }
 
 function uniqueElements(elements: Element[]): Element[] {

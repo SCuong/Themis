@@ -6,6 +6,8 @@ import type { RuntimeFrameRegistry } from './runtimeFrames'
 import { mutateStore, requireChat } from './storeAccess'
 import { enqueueCleanup, purgeChatData, runCleanup } from './cleanupQueue'
 import { deleteRemoteConversations, type RemoteDeleteDependencies } from './remoteDelete'
+import { stopStaleActiveRun } from './orchestrationRuntime'
+import type { SitePromptDeliveryLimiter } from './sitePromptDeliveryLimiter'
 
 export const CHAT_ROUTE_TYPES = [
   'GROUP_CHAT_CREATE',
@@ -28,6 +30,7 @@ export interface ChatHandlersDependencies {
   newId(prefix: string): string
   now(): number
   runtimeFrames: Pick<RuntimeFrameRegistry, 'removeRole' | 'getByRole'>
+  promptDeliveryLimiter?: Pick<SitePromptDeliveryLimiter, 'complete'>
   sendRoleMessage: RemoteDeleteDependencies['sendRoleMessage']
   imageAttachments: {
     deleteByMessageIds(messageIds: string[]): Promise<void>
@@ -141,6 +144,10 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
       const roleIds = [...chat.roleIds]
       const messageIds = [...chat.messageIds]
       const fileIds: string[] = []
+      // The run's task and prompts are about to be deleted, so it can never continue.
+      const activeRun = store.orchestrationRunsById[store.activeOrchestrationRunIdByChatId[chat.id]]
+      const stoppedDeliveries = activeRun ? stopStaleActiveRun(store, chat, activeRun, timestamp, 'Chat history was cleared while the workflow was running') : []
+      delete store.activeOrchestrationRunIdByChatId[chat.id]
 
       for (const messageId of messageIds) {
         for (const file of store.messagesById[messageId]?.files ?? []) if (file?.id) fileIds.push(file.id)
@@ -170,8 +177,10 @@ export function createChatHandlers(deps: ChatHandlersDependencies): BackgroundMe
       chat.status = roleIds.length > 0 ? 'initializing' : 'draft'
       markChatRead(store, chat)
       const cleanupId = enqueueCleanup(store, { id: deps.newId('cleanup'), kind: 'messages', chatId: chat.id, messageIds, fileIds, createdAt: timestamp })
-      return { chatId: chat.id, roleIds, messageIds, cleanupId }
+      return { chatId: chat.id, roleIds, messageIds, cleanupId, stoppedDeliveries }
     })
+    // Free the stopped workflow's per-site delivery slots (DeepSeek allows two at a time).
+    for (const delivery of result.stoppedDeliveries) await deps.promptDeliveryLimiter?.complete(chatId, delivery.messageId, delivery.roleId)
     const pending = await runCleanup(deps)
     deps.log.info('chat-clear-messages:stored', { chatId: result.chatId, roleCount: result.roleIds.length, messageCount: result.messageIds.length })
     await deps.broadcastStoreUpdated(store)

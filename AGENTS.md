@@ -1,5 +1,42 @@
 # Notes for coding agents
 
+## Workspace: one repository
+
+- Work only in `V:\repos\Themis`. Remote: `https://github.com/SCuong/Themis`.
+- Never develop in `V:\archives\Themis-legacy\*` (old `themis-ts-port`, `themis-e2e` clones) or in
+  `V:\openteam-extension-v1.0.3` (old non-git copy; Chrome loads it unpacked, so leave it alone).
+  `V:\openteam-extension-v1.0.3.zip` is the OpenTeam upstream reference only.
+- Do not clone another Themis checkout to replace this one. Create a git worktree only on purpose, under
+  `.claude/worktrees/` in this repo, and say so.
+
+## Source of truth
+
+- TypeScript in `src/` is the source. Vite builds it into `dist/` (`npm run build`); never edit `dist/`.
+- The root files listed in `STATIC_FILES` in `vite.config.ts` (`team.html`, `team.css`, `team-ui.js`,
+  `localization.js`, `composer-files.js`, ...) are hand-written and copied into `dist/` as they are.
+- Do not sync code from OpenTeam upstream into Themis, and make no large architecture change unless asked.
+
+## Git
+
+- Before editing, check `git status`, the branch and HEAD. Other agents and the user may have changes here:
+  never overwrite or discard them.
+- Never `git reset --hard`, `git clean`, force-push, or merge into `main` on your own. Keep each change small
+  and reviewable.
+
+## Fixing bugs
+
+- Reproduce the bug first; prefer a regression test that fails before the fix. Fix the root cause.
+- Never call something FIXED without running the tests that prove it, and never claim a test ran when it did not.
+- For async changes (prompt delivery, orchestration, frames), check race conditions and cancellation.
+- Preserve user chats, notes, attachments and settings (storage formats, IndexedDB records).
+
+## Verification
+
+`npm run build`, then `npm run check` (types plus syntax of the built `dist/` files), `npm test`, and
+`npm run test:frames` when frame rules or loading change. For UI or orchestration bugs, drive the real
+extension in Playwright Chromium (below). Never use the user's real Chrome profile or data for tests, and
+put temporary files in `test-results/` or the system temp dir, not elsewhere on `V:`.
+
 ## Testing: you can drive the real extension in a browser
 
 Do not stop at the unit tests or ask the user to check by hand. This repo can load Themis unpacked in a
