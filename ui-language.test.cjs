@@ -43,6 +43,14 @@ test('Themis switches between Vietnamese and English across its main screens', {
     await page.locator('#close-group-template-modal').click();
     await page.locator('#open-orchestration').click();
     await assertNoChinese('Orchestration');
+    await page.locator('.orchestration-stage-canvas .x6-graph-svg').waitFor({ state: 'attached' });
+    await page.locator('.orchestration-person').first().click();
+    await page.locator('.orchestration-stage-canvas [data-stage-id][role="button"]').first().press('Enter');
+    assert.match(await page.locator('#orchestration-stage-settings').innerText(), /Loại bước/);
+    assert.match(await page.locator('#orchestration-stage-settings').innerText(), /Tên bước/);
+    assert.match(await page.locator('#orchestration-task').getAttribute('placeholder'), /Mô tả nhiệm vụ/);
+    await page.locator('[data-stage-kind]').selectOption('review');
+    assert.match(await page.locator('#orchestration-review-settings').innerText(), /Tiêu chí đánh giá/);
     await page.locator('#close-orchestration').click();
     await page.setViewportSize({ width: 375, height: 812 });
     await assertNoChinese('Vietnamese on a 375 px screen');

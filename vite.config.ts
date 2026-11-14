@@ -14,6 +14,7 @@ export const STATIC_FILES = [
   'localization.js',
   'profile-avatars.js',
   'assets/icons',
+  'assets/fonts',
   'assets/profile-atlas.webp',
   'vendor',
   'LICENSE',

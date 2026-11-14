@@ -1,9 +1,9 @@
 import type { GroupRole, OrchestrationGraphSnapshot, OrchestrationStage } from '../group/types'
 
-const ROLE_NODE_WIDTH = 124
-const ROLE_NODE_HEIGHT = 56
-const REVIEW_NODE_WIDTH = 104
-const REVIEW_NODE_HEIGHT = 78
+const ROLE_NODE_WIDTH = 152
+const ROLE_NODE_HEIGHT = 68
+const REVIEW_NODE_WIDTH = 120
+const REVIEW_NODE_HEIGHT = 90
 const DEFAULT_NODE_CENTER_Y = 100
 const ARRANGED_NODE_CENTER_Y = 124
 const LANE_GAP = 112
@@ -132,7 +132,7 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
     graph = new Graph({
       container: deps.rootEl,
       autoResize: true,
-      grid: { size: 18, visible: true, type: 'dot', args: { color: 'rgba(87, 216, 221, 0.14)' } },
+      grid: { size: 20, visible: true, type: 'dot', args: { color: 'rgba(128, 138, 148, 0.22)' } },
       panning: true,
       mousewheel: { enabled: true, modifiers: ['ctrl', 'meta'] },
       interacting: {
@@ -298,10 +298,11 @@ export function createOrchestrationCanvas(deps: OrchestrationCanvasDependencies)
             },
             label: {
               fill: 'var(--orchestration-node-text)',
-              fontSize: 11,
-              fontWeight: 720,
-              lineHeight: 15,
-              textWrap: { width: 96, height: 34, ellipsis: true },
+              fontFamily: 'Geist, Segoe UI, sans-serif',
+              fontSize: 12,
+              fontWeight: 550,
+              lineHeight: 18,
+              textWrap: { width: isReview ? 92 : 128, height: 40, ellipsis: true },
             },
           },
         }
@@ -386,8 +387,9 @@ function edgeBranchLabel(branch: 'pass' | 'fail'): Record<string, unknown> {
       label: {
         text: failBranch ? 'Fail' : 'Pass',
         fill: 'var(--orchestration-edge-label-text)',
-        fontSize: 9,
-        fontWeight: 720,
+        fontFamily: 'Geist, Segoe UI, sans-serif',
+        fontSize: 11,
+        fontWeight: 550,
       },
       body: {
         fill: 'var(--orchestration-edge-label-bg)',
@@ -535,7 +537,7 @@ export function arrangeOrchestrationGraph(stages: OrchestrationStage[], edges: O
       ...stage,
       roleIds: [...stage.roleIds],
       review: stage.review ? { ...stage.review, reviewerRoleIds: [...stage.review.reviewerRoleIds] } : undefined,
-      position: { x: 56 + level * 180, y: centerY - nodeHeight(isReview) / 2 },
+      position: { x: 56 + level * 208, y: centerY - nodeHeight(isReview) / 2 },
     }
   })
   const positionById = new Map(positioned.map(stage => [stage.id, stage.position]))
@@ -607,7 +609,7 @@ function laneCenterY(index: number, count: number): number {
 }
 
 function defaultStagePosition(index: number, isReview: boolean): { x: number; y: number } {
-  return { x: 48 + index * 154, y: DEFAULT_NODE_CENTER_Y - nodeHeight(isReview) / 2 }
+  return { x: 48 + index * 208, y: DEFAULT_NODE_CENTER_Y - nodeHeight(isReview) / 2 }
 }
 
 function nodeWidth(isReview: boolean): number {

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Themis Design Lab — so sánh 3 art direction</title>
+<style>
+  :root { --bar: 52px; --ink: #f2f0ea; --dim: #8d8a83; --line: #2a2a2c; --bg: #0e0e0f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 500 13px/1.3 ui-sans-serif, "Segoe UI", system-ui, sans-serif; }
+  .bar { height: var(--bar); display: flex; align-items: stretch; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 18px; border-right: 1px solid var(--line); white-space: nowrap; }
+  .brand b { letter-spacing: .14em; font-size: 12px; }
+  .brand span { color: var(--dim); }
+  nav { display: flex; flex: 1; min-width: 0; }
+  nav a { position: relative; display: flex; align-items: center; gap: 10px; padding: 0 20px; color: var(--dim);
+    text-decoration: none; border-right: 1px solid var(--line); white-space: nowrap; transition: color .15s, background .15s; }
+  nav a:hover { color: var(--ink); background: #161617; }
+  nav a[aria-current="page"] { color: var(--ink); background: #18181a; }
+  nav a[aria-current="page"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--swatch); }
+  nav kbd { font: 600 11px ui-monospace, Consolas, monospace; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  nav i { width: 10px; height: 10px; border-radius: 2px; background: var(--swatch); flex: none; }
+  nav small { color: var(--dim); font-weight: 400; }
+  .tools { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+  .tools a, .tools button { height: 32px; display: inline-flex; align-items: center; padding: 0 12px; color: var(--ink); background: none;
+    border: 1px solid var(--line); border-radius: 6px; font: inherit; text-decoration: none; cursor: pointer; }
+  .tools a:hover, .tools button:hover { background: #1b1b1d; }
+  :focus-visible { outline: 2px solid #f2f0ea; outline-offset: 2px; }
+  main { position: relative; height: calc(100% - var(--bar)); }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  iframe[hidden] { display: none; }
+  dialog { max-width: 620px; background: #161617; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 24px 28px; line-height: 1.55; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h2 { margin: 0 0 8px; font-size: 16px; }
+  dialog h3 { margin: 18px 0 6px; font-size: 13px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  dialog ul { margin: 0; padding-left: 18px; }
+  @media (max-width: 860px) { nav small, .brand span { display: none; } nav a { padding: 0 12px; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><b>THEMIS</b><span>Design Lab</span></div>
+  <nav aria-label="Art direction">
+    <a href="#len-song" data-src="len-song/index.html" style="--swatch:#ff3b1f"><kbd>1</kbd><i></i>LÊN SÓNG <small>phòng phát sóng</small></a>
+    <a href="#open-case" data-src="open-case/index.html" style="--swatch:#c8321e"><kbd>2</kbd><i style="background:#faf7f0"></i>OPEN CASE <small>bàn biên tập</small></a>
+    <a href="#playhouse" data-src="playhouse/index.html" style="--swatch:#3357d8"><kbd>3</kbd><i style="background:#e9ef64"></i>PLAYHOUSE <small>xưởng sáng tạo</small></a>
+  </nav>
+  <div class="tools">
+    <button type="button" id="reset" title="Chạy lại kịch bản của bản đang xem">Chạy lại</button>
+    <a id="solo" href="len-song/index.html" target="_blank" rel="noopener">Mở riêng ↗</a>
+    <button type="button" id="about">Thật / mô phỏng</button>
+  </div>
+</header>
+<main id="stage"></main>
+
+<dialog id="notes">
+  <h2>Cái gì thật, cái gì mô phỏng</h2>
+  <p>Cả ba bản dùng chung một kịch bản (<code>shared/mock-data.js</code>) và một runtime (<code>shared/engine.js</code>), nên mọi khác biệt bạn thấy là khác biệt thiết kế, không phải khác biệt dữ liệu.</p>
+  <h3>Tương tác thật trong prototype</h3>
+  <ul>
+    <li>Chọn thành viên, đọc, chuyển góc nhìn, cuộn, phím tắt.</li>
+    <li>Composer gửi được tin: <code>@Tên</code> hoặc <code>@all</code>; các thành viên được nhắc sẽ chờ rồi trả lời từng chữ.</li>
+    <li>Nút “Thử lại” khi một thành viên lỗi.</li>
+    <li>Mỗi lần mở là một phiên mới: một vòng hỏi đáp chạy trực tiếp ngay khi trang tải.</li>
+  </ul>
+  <h3>Chỉ là mô phỏng</h3>
+  <ul>
+    <li>Không có AI thật. Câu trả lời là văn bản soạn sẵn, phát lại theo đồng hồ giả lập.</li>
+    <li>Lỗi Grok của Vân là kịch bản; “Thử lại” luôn thành công.</li>
+    <li>Câu trả lời cho tin bạn tự gửi là mẫu chung, chỉ chèn lại câu hỏi của bạn.</li>
+    <li>Các điểm bất đồng được đánh dấu sẵn trong dữ liệu, không do máy tự phát hiện.</li>
+  </ul>
+  <form method="dialog" style="margin-top:20px;text-align:right"><button style="height:32px;padding:0 14px;border-radius:6px;border:1px solid #2a2a2c;background:#f2f0ea;color:#0e0e0f;font:inherit;cursor:pointer">Đã hiểu</button></form>
+</dialog>
+
+<script>
+  const links = [...document.querySelectorAll('nav a')];
+  const stage = document.getElementById('stage');
+  const frames = {};
+  function show(id) {
+    const link = links.find(a => a.hash === '#' + id) || links[0];
+    id = link.hash.slice(1);
+    if (!frames[id]) {
+      const f = document.createElement('iframe');
+      f.title = link.textContent.replace(/\s+/g, ' ').trim();
+      f.src = link.dataset.src;
+      stage.append(f);
+      frames[id] = f;
+    }
+    for (const [key, f] of Object.entries(frames)) f.hidden = key !== id;
+    links.forEach(a => a === link ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    document.getElementById('solo').href = link.dataset.src;
+    frames[id].focus();
+  }
+  addEventListener('hashchange', () => show(location.hash.slice(1)));
+  document.getElementById('reset').onclick = () => { const id = (location.hash || '#len-song').slice(1); frames[id] && (frames[id].src = frames[id].src); };
+  document.getElementById('about').onclick = () => document.getElementById('notes').showModal();
+  addEventListener('keydown', e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || /input|textarea/i.test(e.target.tagName)) return;
+    const i = ['1', '2', '3'].indexOf(e.key);
+    if (i >= 0) location.hash = links[i].hash;
+  });
+  show(location.hash.slice(1) || 'len-song');
+</script>
+</body>
+</html>
