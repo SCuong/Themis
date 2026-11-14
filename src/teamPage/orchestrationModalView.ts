@@ -5,6 +5,7 @@ import { arrangeOrchestrationGraph, createOrchestrationCanvas, reviewEdgeBranch,
 import { appendStageConnections } from '../../team-ui.js'
 import { normalizeLanguage } from '../shared/i18n'
 import { runCommandWithReconnect } from './sendWithReconnect'
+import { applyTeamLanguage } from './languageController'
 
 export interface OrchestrationModalDependencies {
   openOrchestrationEl: HTMLButtonElement
@@ -163,6 +164,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     renderStageSettings()
     renderAutoPanel()
     if (mounted) canvas?.render(draft.stages, draft.selectedStageId, draft.graphEdges)
+    applyTeamLanguage(normalizeLanguage(deps.getStore().settings.language), deps.orchestrationModalEl)
   }
 
   function renderPeopleList(): void {
@@ -253,6 +255,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     }
 
     deps.orchestrationTemplateContentEl.append(panel)
+    applyTeamLanguage(normalizeLanguage(deps.getStore().settings.language), deps.orchestrationTemplateModalEl)
   }
 
   function templateCard(template: BuiltinOrchestrationTemplate): HTMLElement {
@@ -377,6 +380,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     deps.orchestrationStageSettingsEl.append(remove)
 
     if (selected.kind === 'review') renderReviewSettings(selected)
+    applyTeamLanguage(normalizeLanguage(deps.getStore().settings.language), deps.orchestrationStageSettingsEl.closest('.orchestration-settings')!)
   }
 
   function renderReviewSettings(stage: OrchestrationStage): void {
@@ -625,6 +629,7 @@ export function createOrchestrationModalView(deps: OrchestrationModalDependencie
     form.append(inputShell)
 
     chat.append(messages, form)
+    applyTeamLanguage(normalizeLanguage(deps.getStore().settings.language), deps.orchestrationAutoModalEl)
     messages.scrollTop = messages.scrollHeight
   }
 

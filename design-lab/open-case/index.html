@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Themis · Open Case</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#paper">Bỏ qua mục lục</a>
+<div class="app">
+  <aside class="index" id="index" aria-label="Mục lục hồ sơ">
+    <div class="index-head">
+      <p class="eyebrow">Hồ sơ mở</p>
+      <h2 id="room-title"></h2>
+      <button class="icon-btn close-index" type="button" aria-label="Đóng mục lục" data-close-index>✕</button>
+    </div>
+    <section class="index-block">
+      <h3>Thành viên</h3>
+      <ul class="people" id="people"></ul>
+    </section>
+    <section class="index-block">
+      <h3>Mục lục</h3>
+      <ol class="toc" id="toc"></ol>
+    </section>
+    <section class="index-block log-block">
+      <h3>Nhật ký</h3>
+      <ol class="log" id="log" aria-live="polite"></ol>
+    </section>
+    <p class="keys"><kbd>J</kbd><kbd>K</kbd> mục kế · <kbd>/</kbd> viết · <kbd>V</kbd> đổi góc nhìn</p>
+  </aside>
+
+  <main class="paper" id="paper" tabindex="-1">
+    <div class="mobile-bar">
+      <button class="text-btn" type="button" data-open-index>☰ Hồ sơ</button>
+      <span id="mobile-status"></span>
+    </div>
+    <header class="masthead">
+      <p class="eyebrow" id="meta"></p>
+      <h1 id="question"></h1>
+      <div class="views" role="tablist" aria-label="Góc nhìn">
+        <button role="tab" id="tab-case" aria-controls="view-case" aria-selected="true">Hồ sơ</button>
+        <button role="tab" id="tab-args" aria-controls="view-args" aria-selected="false">Luận điểm</button>
+      </div>
+      <p class="filter-note" id="filter-note" hidden></p>
+    </header>
+
+    <section id="view-case" role="tabpanel" aria-labelledby="tab-case">
+      <section class="disputes" id="disputes" aria-labelledby="disputes-h">
+        <h2 class="section-h" id="disputes-h">Còn bất đồng ở đâu?</h2>
+        <div id="dispute-list"></div>
+      </section>
+      <div id="rounds"></div>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="section-h" for="composer-text">Câu hỏi tiếp theo</label>
+        <div class="composer-quote" id="composer-quote" hidden></div>
+        <textarea id="composer-text" rows="3" placeholder="Viết cho cả nhóm, hoặc gọi tên: @Khoa @Rook…"></textarea>
+        <div class="composer-row">
+          <div class="recipients" id="recipients" role="group" aria-label="Gửi cho"></div>
+          <button class="send" type="submit" id="send">Gửi</button>
+        </div>
+        <p class="hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> để gửi. Bôi đen một đoạn bất kỳ để nhờ phản biện hoặc ghi chú lề.</p>
+      </form>
+    </section>
+
+    <section id="view-args" role="tabpanel" aria-labelledby="tab-args" hidden>
+      <h2 class="section-h">Ai đứng ở đâu</h2>
+      <p class="lede">Mỗi hàng là một điểm còn tranh cãi; mỗi cột là một thành viên. Ô trống nghĩa là người đó chưa lên tiếng, không phải đồng ý.</p>
+      <div class="matrix-wrap"><table class="matrix" id="matrix"></table></div>
+    </section>
+  </main>
+</div>
+
+<button class="notice" id="notice" type="button" hidden></button>
+
+<div class="seltool" id="seltool" role="toolbar" aria-label="Với đoạn đã chọn" hidden>
+  <div class="seltool-main">
+    <button type="button" data-act="critique">Nhờ phản biện</button>
+    <button type="button" data-act="note">Ghi chú lề</button>
+  </div>
+  <div class="seltool-pick" hidden></div>
+</div>
+
+<script src="../shared/mock-data.js"></script>
+<script src="../shared/engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
