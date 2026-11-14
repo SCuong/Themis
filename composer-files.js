@@ -386,12 +386,19 @@ function init() {
   });
 
   globalThis.themisComposerFiles = {
-    list: () => files.map(({ id, name, type, size, dataUrl }) => ({ id, name, type, size, dataUrl })),
-    // After a send the tiles leave the composer; the stored copies stay for the sent message.
-    clear() {
-      files.splice(0);
+    // A send takes its files out of the composer at once, so a file added while it runs belongs to the next
+    // message. The stored copies stay for the sent message. restore() puts them back if the send fails.
+    take() {
+      const taken = files.splice(0);
       status.textContent = "";
       render();
+      return {
+        files: taken.map(({ id, name, type, size, dataUrl }) => ({ id, name, type, size, dataUrl })),
+        restore() {
+          files.unshift(...taken);
+          render();
+        },
+      };
     },
     messageFiles(message) {
       if (!message.files?.length) return undefined;

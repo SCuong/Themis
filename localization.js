@@ -309,6 +309,20 @@ export const vietnamese = {
   "Image storage is unavailable": "Bộ nhớ ảnh không khả dụng",
   "Could not open image storage": "Không mở được bộ nhớ ảnh",
   "API key is invalid or has insufficient permissions. Check the configuration.": "Khóa API không hợp lệ hoặc thiếu quyền. Hãy kiểm tra cấu hình.",
+  "No agents yet": "Chưa có thành viên nào",
+  "Add agents first to start collaborating in a group chat.": "Hãy thêm thành viên để bắt đầu thảo luận nhóm.",
+  "Add": "Thêm",
+  "Add people to start chatting": "Vui lòng thêm thành viên để bắt đầu trò chuyện",
+  "No messages yet. Restore a chat, add agents, or send your first task.": "Chưa có tin nhắn. Hãy thêm thành viên hoặc gửi nhiệm vụ đầu tiên.",
+  "Canvas nodes execute in connection order. Multiple agents in the same node work in parallel.": "Các bước chạy theo thứ tự kết nối. Nhiều thành viên trong cùng một bước làm việc song song.",
+  "Describe the task for the workflow to complete. You do not need to @mention agents.": "Mô tả nhiệm vụ cần hoàn thành. Không cần @nhắc thành viên.",
+  "Defaults to 50, up to 200. Prevents workflows from looping indefinitely. Both execution and review nodes count toward the limit.": "Mặc định 50, tối đa 200. Ngăn quy trình lặp vô hạn. Cả bước thực hiện và bước đánh giá đều được tính.",
+  "Apply a structure first, then adjust agents and nodes for the current task.": "Chọn một cấu trúc trước, rồi chỉnh thành viên và các bước cho nhiệm vụ hiện tại.",
+  "Start from a template": "Bắt đầu từ mẫu",
+  "Select a template to generate a draft you can continue editing.": "Chọn mẫu để tạo bản nháp, sau đó bạn có thể chỉnh tiếp.",
+  "Orchestration type": "Kiểu điều phối",
+  "Use case": "Tình huống",
+  "Orchestration requires an external model API. Configure an external model first.": "Điều phối cần một mô hình API. Hãy cấu hình mô hình API trước.",
 };
 
 const english = new Map(Object.entries(vietnamese).map(([key, value]) => [value, key]));

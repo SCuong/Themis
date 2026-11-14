@@ -42,15 +42,34 @@ function unreferencedFiles(store: OpenTeamStore, ids: string[]): string[] {
   return ids.filter(id => !used.has(id))
 }
 
-async function deleteComposerFiles(ids: string[] | undefined): Promise<void> {
-  if (!ids?.length) return
+async function openComposerFiles(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') throw new Error('File storage is unavailable')
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(COMPOSER_FILES_DATABASE, 1)
     request.onupgradeneeded = () => request.result.createObjectStore(COMPOSER_FILES_STORE, { keyPath: 'id' })
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
+}
+
+// The stored bytes of each composer file, in the order of `ids`; undefined where a file is not stored.
+export async function readComposerFileBlobs(ids: Array<string | undefined>): Promise<Array<Blob | undefined>> {
+  const db = await openComposerFiles()
+  try {
+    const files = db.transaction(COMPOSER_FILES_STORE, 'readonly').objectStore(COMPOSER_FILES_STORE)
+    return await Promise.all(ids.map(id => id === undefined ? undefined : new Promise<Blob | undefined>((resolve, reject) => {
+      const request = files.get(id)
+      request.onsuccess = () => resolve(request.result?.blob instanceof Blob ? request.result.blob : undefined)
+      request.onerror = () => reject(request.error)
+    })))
+  } finally {
+    db.close()
+  }
+}
+
+async function deleteComposerFiles(ids: string[] | undefined): Promise<void> {
+  if (!ids?.length) return
+  const db = await openComposerFiles()
   try {
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(COMPOSER_FILES_STORE, 'readwrite')

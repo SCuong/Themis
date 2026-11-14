@@ -1,5 +1,5 @@
 import { profileAvatarClass } from '../../profile-avatars.js'
-import type { GroupChat, GroupMessage, OpenTeamStore } from '../group/types'
+import type { GroupMessage } from '../group/types'
 import { getAvatarInitial } from './chatExperience'
 
 export function emptyCard(title: string, body: string): HTMLElement {
@@ -26,13 +26,6 @@ export function roleToneClass(seed: string | undefined): string {
 
 export function roleAvatarLabel(name: string | undefined): string {
   return getAvatarInitial(name)
-}
-
-export function getChatRecentSummary(chat: GroupChat, store: OpenTeamStore): string {
-  const lastMessageId = chat.messageIds[chat.messageIds.length - 1]
-  const message = lastMessageId ? store.messagesById[lastMessageId] : undefined
-  if (!message) return 'No messages yet. Restore a chat, add agents, or send your first task.'
-  return `${messageTitle(message)}: ${truncate(message.content, 72)}`
 }
 
 export function messageTitle(message: GroupMessage): string {

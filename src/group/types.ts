@@ -199,6 +199,8 @@ export interface OrchestrationStageRun {
   reviewResults?: OrchestrationReviewResult[]
   startedAt?: number
   completedAt?: number
+  /** Set when Stop cut this node short, so Resume runs it again. */
+  interrupted?: boolean
 }
 
 export interface OrchestrationRun {
@@ -319,6 +321,8 @@ export interface GroupMessage {
 
 export interface ReplyImageSource {
   sourceUrl: string
+  // The image bytes, read inside the site page (blob: sources cannot be fetched from anywhere else).
+  dataUrl?: string
   alt?: string
   width?: number
   height?: number

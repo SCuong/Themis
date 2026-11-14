@@ -251,10 +251,13 @@ function installTooltips() {
   document.body.append(tip);
   let timer, pending, shown;
   const control = node => node?.closest?.('button, [role="button"]');
-  // Some icon buttons are named by text shrunk to font-size 0 (e.g. Restore session).
+  // Some icon buttons are named by text shrunk to font-size 0 (e.g. Restore session), or by a label that CSS clips
+  // to 1px when the toolbar goes icon-only in a narrow window (Orchestration, Members, Notes).
+  const clipped = el => [...el.children].find(child => child.textContent.trim() && child.getBoundingClientRect().width <= 1)?.textContent.trim() || '';
   const label = el => el.getAttribute('aria-label') || el.getAttribute('title') || el.dataset.tooltip ||
-    (getComputedStyle(el).fontSize === '0px' ? el.textContent.trim() : '');
-  const iconOnly = el => el && !el.disabled && el.getBoundingClientRect().width <= 56 && label(el);
+    (getComputedStyle(el).fontSize === '0px' ? el.textContent.trim() : clipped(el));
+  // A clipped label counts whatever the width: Members keeps its count badge beside the icon.
+  const iconOnly = el => el && !el.disabled && (el.getBoundingClientRect().width <= 56 || clipped(el)) && label(el);
   const hide = () => { clearTimeout(timer); pending = shown = undefined; tip.classList.remove('visible'); };
   const show = el => {
     // The browser's own title tooltip would show a second, slower copy.
@@ -452,29 +455,10 @@ export function initializeTeamUI() {
   }
 
 
-  // team.js writes the header as plain text; this splits it into the chat tile, an iconed meta line and a members badge.
-  const chatTitle = document.getElementById('chat-title');
-  const chatStatus = document.getElementById('chat-status');
-  const chatSubtitle = document.getElementById('chat-subtitle');
+  // team.js writes the header buttons as plain text; this splits "Members 3" into a label and a count badge.
   const headerButtons = ['toggle-people-drawer', 'toggle-notes-panel'].map(id => document.getElementById(id)).filter(Boolean);
-  if (chatTitle && chatStatus && chatSubtitle) {
-    const tile = document.createElement('span');
-    tile.className = 'chat-header-avatar';
-    tile.setAttribute('aria-hidden', 'true');
-    chatTitle.closest('.chat-title-block')?.before(tile);
+  if (headerButtons.length) {
     const decorate = () => {
-      // An empty header (no chat) has no status-* class.
-      tile.hidden = ![...chatStatus.classList].some(name => name.startsWith('status-'));
-      tile.textContent = Array.from(chatTitle.textContent.trim())[0]?.toUpperCase() || '';
-      const parts = chatSubtitle.textContent.split(' · ');
-      if (parts.length === 3 && !chatSubtitle.querySelector('.chat-meta-item')) {
-        chatSubtitle.replaceChildren(...parts.map((part, index) => {
-          const item = document.createElement('span');
-          item.className = `chat-meta-item chat-meta-${['mode', 'members', 'messages'][index]}`;
-          item.textContent = part;
-          return item;
-        }));
-      }
       for (const button of headerButtons) {
         if (button.querySelector('.header-label')) continue;
         const [, name, count] = button.textContent.trim().match(/^(.*?)\s*(\d+)?$/);
@@ -487,8 +471,7 @@ export function initializeTeamUI() {
         button.replaceChildren(label, ...(count ? [badge] : []));
       }
     };
-    for (const element of [chatTitle, chatSubtitle, ...headerButtons]) new MutationObserver(decorate).observe(element, { childList: true, characterData: true, subtree: true });
-    new MutationObserver(decorate).observe(chatStatus, { attributes: true, attributeFilter: ['class'] });
+    for (const element of headerButtons) new MutationObserver(decorate).observe(element, { childList: true, characterData: true, subtree: true });
     decorate();
   }
 

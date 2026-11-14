@@ -17,6 +17,16 @@ const MARK_MENU_SELECTION_GAP_PX = 12
 const MARK_MENU_FALLBACK_HEIGHT_PX = 148
 const MARK_MENU_SELECTION_SETTLE_DELAY_MS = 80
 const markdownRenderer = new MarkdownIt({ html: false, linkify: true, breaks: true })
+// TeX in replies ($…$, $$…$$) stays verbatim: Markdown escapes would eat its \{ and \\ and read _ as emphasis.
+// shortcut: formulas show as TeX source, not typeset; add a math renderer (KaTeX) if typeset formulas are wanted.
+markdownRenderer.inline.ruler.before('escape', 'tex', (state, silent) => {
+  if (state.src.charCodeAt(state.pos) !== 0x24) return false
+  const match = /^(?:\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/.exec(state.src.slice(state.pos))
+  if (!match) return false
+  if (!silent) state.push('text', '', 0).content = match[0]
+  state.pos += match[0].length
+  return true
+})
 // composer-files.js renders Markdown attachments with the same parser.
 globalThis.ThemisMarkdownIt = MarkdownIt
 
@@ -775,13 +785,19 @@ export function createMessagesView(deps: MessagesViewDependencies): MessagesView
 
   function emptyChatPeopleCard(title: string, body: string): HTMLElement {
     const wrapper = deps.emptyCard(title, body)
-    const card = wrapper.querySelector('.empty-card')
+    const card = wrapper.querySelector('.empty-card')!
+    card.classList.add('empty-card-people')
+    const art = document.createElement('div')
+    art.className = 'empty-illustration'
+    art.innerHTML = GROUP_ILLUSTRATION
+    card.prepend(art)
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'btn btn-primary'
-    button.textContent = 'Add people'
+    button.textContent = 'Add'
+    button.setAttribute('aria-label', 'Add people')
     button.addEventListener('click', deps.openAddPersonDialog)
-    card?.append(button)
+    card.append(button)
     return wrapper
   }
 
@@ -1103,3 +1119,21 @@ function wrapTextRange(root: HTMLElement, startOffset: number, endOffset: number
     mark.append(selected)
   }
 }
+
+// A team around one person, drawn from one person symbol so it follows the theme colours (see .empty-illustration).
+const GROUP_ILLUSTRATION = (() => {
+  const outer = [-90, -30, 30, 90, 150, 210].map(angle => {
+    const radians = angle * Math.PI / 180
+    return [80 + 54 * Math.cos(radians), 74 + 54 * Math.sin(radians)].map(value => Math.round(value * 10) / 10)
+  })
+  const node = (x: number, y: number, r: number, center = false) =>
+    `<g class="${center ? 'node node-center' : 'node'}"><circle cx="${x}" cy="${y}" r="${r}"/><use href="#empty-person" x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}"/></g>`
+  const spokes = outer.map(([x, y]) => `<line x1="80" y1="74" x2="${x}" y2="${y}"/>`).join('')
+  const ring = `<polygon points="${outer.map(point => point.join(',')).join(' ')}"/>`
+  return `<svg viewBox="0 0 160 148" aria-hidden="true" focusable="false">`
+    + `<defs><symbol id="empty-person" viewBox="-1 -1 2 2"><clipPath id="empty-person-clip"><circle r=".94"/></clipPath>`
+    + `<g clip-path="url(#empty-person-clip)"><circle cy="-.2" r=".34"/><ellipse cy=".86" rx=".64" ry=".52"/></g></symbol></defs>`
+    + `<g class="links">${ring}${spokes}</g>`
+    + outer.map(([x, y]) => node(x, y, 17)).join('') + node(80, 74, 25, true)
+    + `</svg>`
+})()

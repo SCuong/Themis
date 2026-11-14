@@ -87,7 +87,7 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const button = document.createElement('button')
     button.type = 'button'
     button.className = `orchestration-status orchestration-status-floating orchestration-status-collapsed orchestration-status-${run.status}`
-    const label = `${STATUS_LABELS[run.status]} · ${currentNodeText(run, flow)} · ${run.stageRuns.length} / ${maxExecutions(run)}`
+    const label = `${STATUS_LABELS[run.status]} · ${currentNodeText(run, flow)} · ${executedStageCount(run)} / ${maxExecutions(run)}`
     button.textContent = 'Flow'
     button.title = label
     button.setAttribute('aria-label', `${label}, click to expand`)
@@ -168,7 +168,7 @@ export function createOrchestrationStatusView(deps: OrchestrationStatusViewDepen
     const count = document.createElement('div')
     count.className = 'orchestration-status-count'
     const value = document.createElement('strong')
-    value.textContent = `${run.stageRuns.length} / ${maxExecutions(run)}`
+    value.textContent = `${executedStageCount(run)} / ${maxExecutions(run)}`
     const label = document.createElement('span')
     label.textContent = 'Nodes executed'
     count.append(value, label)
@@ -504,8 +504,16 @@ function orthogonalPoints(start: { x: number; y: number }, vertices: Array<{ x: 
   return points
 }
 
+// A reserved node (pending, or interrupted by Stop before it started) has not executed.
+function executedStageCount(run: OrchestrationRun): number {
+  return run.stageRuns.filter(stageRun => stageRun.status !== 'pending' && !(stageRun.interrupted && Object.keys(stageRun.roleRuns).length === 0)).length
+}
+
 function currentStageRun(run: OrchestrationRun): OrchestrationStageRun | undefined {
-  return [...run.stageRuns].reverse().find(stageRun => stageRun.status === 'running' || stageRun.status === 'error') ?? run.stageRuns[run.stageRuns.length - 1]
+  const latest = [...run.stageRuns].reverse()
+  // A failed node first (its retry actions), then a running one, then one waiting to start.
+  // An error that a later run of the same node superseded is not current.
+  return latest.find(stageRun => stageRun.status === 'error' && latest.find(other => other.stageId === stageRun.stageId) === stageRun) ?? latest.find(stageRun => stageRun.status === 'running') ?? latest.find(stageRun => stageRun.status === 'pending') ?? latest[0]
 }
 
 function currentNodeText(run: OrchestrationRun, flow: OrchestrationFlow): string {

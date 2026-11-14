@@ -38,7 +38,8 @@ export interface TeamPageState {
   addPersonTemplateType: 'builtin' | 'custom'
   addPersonSearchQuery: string
   addPersonCategory: string
-  pendingSwitchAnimationFrame?: number
+  // The chat the user just switched to, until the background confirms it.
+  pendingSwitchChatId?: string
   thinkingTimeoutTimers: number[]
   loggedThinkingTimeoutRoleIds: Set<string>
   messageNodeCache: Map<string, CachedMessageNode>
@@ -78,6 +79,8 @@ export function createTeamPageState(): TeamPageState {
 
 export function pickSelectedChatId(state: TeamPageState): string | undefined {
   const store = state.store
+  // A store update that left before the switch (a streamed reply) still names the old chat.
+  if (state.pendingSwitchChatId && store.chatsById[state.pendingSwitchChatId]) return state.pendingSwitchChatId
   if (store.currentChatId && store.chatsById[store.currentChatId]) return store.currentChatId
   if (state.selectedChatId && store.chatsById[state.selectedChatId]) return state.selectedChatId
   return [...store.chatOrder]

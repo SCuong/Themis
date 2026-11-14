@@ -16,6 +16,7 @@ import { createExternalModelClient } from './externalModelClient'
 import { createPromptSender } from './promptDelivery'
 import { createRoleHandlers } from './roleHandlers'
 import { createOrchestrationHandlers, type OrchestrationAutoStreamMessage } from './orchestrationHandlers'
+import { resumeReservedOrchestrationStages } from './orchestrationRuntime'
 import { createRuntimeFrameRegistry } from './runtimeFrames'
 import { createSitePromptDeliveryLimiter } from './sitePromptDeliveryLimiter'
 import { getChatRoles, mutateStore } from './storeAccess'
@@ -118,15 +119,22 @@ function sendResponseSafely(sendResponse: (response?: unknown) => void, response
   }
 }
 
+const orchestrationDeps = { broadcastStoreUpdated, broadcastAutoGenerateStream, externalModelClient, getChatStatusFromRoles, log, newId, now, promptDeliveryLimiter, requestRoleRecovery, runtimeFrames, sendPrompt }
+
 const routeMessage = createMessageRouter([
   { type: 'GROUP_STORE_GET', handler: handleStoreGet },
-  ...createChatHandlers({ broadcastStoreUpdated, getChatStatusFromRoles, imageAttachments: imageAttachmentRepository, log, newId, now, runtimeFrames, sendRoleMessage }),
+  ...createChatHandlers({ broadcastStoreUpdated, getChatStatusFromRoles, imageAttachments: imageAttachmentRepository, log, newId, now, promptDeliveryLimiter, runtimeFrames, sendRoleMessage }),
   { type: 'GROUP_SETTINGS_UPDATE', handler: handleSettingsUpdate },
   ...createExternalModelHandlers({ broadcastStoreUpdated, externalModelClient, newId, now }),
   ...createRoleHandlers({ broadcastStoreUpdated, externalModelClient, log, newId, now, runtimeFrames, sendPrompt }),
-  ...createOrchestrationHandlers({ broadcastStoreUpdated, broadcastAutoGenerateStream, externalModelClient, getChatStatusFromRoles, log, newId, now, promptDeliveryLimiter, requestRoleRecovery, runtimeFrames, sendPrompt }),
+  ...createOrchestrationHandlers(orchestrationDeps),
   ...createMessageHandlers({ broadcastStoreUpdated, externalModelClient, getChatStatusFromRoles, imageAttachments, log, newId, now, promptDeliveryLimiter, requestRoleRecovery, runtimeFrames, sendError, sendPrompt, sendRoleMessage }),
 ])
+
+// Workflow nodes that were waiting to start when the previous service worker stopped.
+resumeReservedOrchestrationStages(orchestrationDeps).catch(error => {
+  log.warn('orchestration-runtime:resume-reserved-failed', { error: errorReason(error) })
+})
 
 cleanupOrphanedImageAttachments().catch(error => {
   log.warn('image-attachments:orphan-cleanup-failed', { error: errorReason(error) })

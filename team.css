@@ -150,7 +150,7 @@ button {
   color: #ececec;
   cursor: pointer;
   font-size: 24px;
-  font-weight: 780;
+  font-weight: 650;
   box-shadow: var(--shadow), var(--glow);
   backdrop-filter: blur(18px);
 }
@@ -277,7 +277,7 @@ button {
   background: rgba(9, 17, 25, 0.96);
   color: var(--text);
   font-size: 12px;
-  font-weight: 720;
+  font-weight: 650;
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -442,17 +442,17 @@ p {
 h1 {
   font-size: 22px;
   line-height: 1.1;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 h2 {
   font-size: 17px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 h3 {
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .muted {
@@ -477,7 +477,7 @@ h3 {
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 720;
+  font-weight: 650;
   transition: 0.16s ease;
 }
 
@@ -550,7 +550,7 @@ h3 {
 .settings-label {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .settings-segment {
@@ -571,7 +571,7 @@ h3 {
   background: transparent;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .settings-menu .settings-segment-option[aria-pressed="true"] {
@@ -690,14 +690,14 @@ h3 {
   display: block;
   color: var(--text);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .mode-help {
   display: block;
   margin-top: 2px;
   color: var(--subtle);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -720,7 +720,7 @@ h3 {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .site-segment[hidden] {
@@ -771,8 +771,8 @@ h3 {
 
 label {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 input,
@@ -934,7 +934,7 @@ select:focus {
   border-radius: 8px;
   color: #ffffff;
   font-size: 13px;
-  font-weight: 780;
+  font-weight: 650;
   line-height: 1;
   background:
     radial-gradient(circle at 32% 25%, rgba(255, 255, 255, 0.34), transparent 22%),
@@ -955,8 +955,8 @@ select:focus {
 
 .chat-time {
   color: #6d7b86;
-  font-size: 10px;
-  font-weight: 680;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.35;
   white-space: nowrap;
 }
@@ -966,7 +966,7 @@ select:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .chat-name {
@@ -1012,7 +1012,7 @@ select:focus {
   background: transparent;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 740;
+  font-weight: 650;
   white-space: nowrap;
 }
 
@@ -1158,7 +1158,7 @@ select:focus {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 780;
+  font-weight: 650;
   line-height: 1;
   transition: 0.16s ease;
   white-space: nowrap;
@@ -1265,7 +1265,7 @@ select:focus {
   overflow: hidden;
   margin: 0 0 4px 2px;
   color: #9aa4ad;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 650;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -1338,7 +1338,7 @@ select:focus {
   color: #ececec;
   cursor: pointer;
   font-size: 15px;
-  font-weight: 820;
+  font-weight: 650;
 }
 
 .orchestration-status-header,
@@ -1370,7 +1370,7 @@ select:focus {
   gap: 8px;
   color: #ececec;
   font-size: 13px;
-  font-weight: 860;
+  font-weight: 650;
 }
 
 .orchestration-status-drag-grip {
@@ -1430,7 +1430,7 @@ select:focus {
 .orchestration-status-count strong {
   color: #ffffff;
   font-size: 22px;
-  font-weight: 900;
+  font-weight: 650;
   line-height: 1.05;
 }
 
@@ -1440,7 +1440,7 @@ select:focus {
 .orchestration-status-current-sub {
   color: #8ea0ad;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
   line-height: 1.4;
 }
 
@@ -1457,7 +1457,7 @@ select:focus {
   overflow: hidden;
   color: #efffff;
   font-size: 15px;
-  font-weight: 860;
+  font-weight: 650;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1476,7 +1476,7 @@ select:focus {
   padding: 4px 8px;
   background: rgba(236, 236, 236, 0.12);
   color: #ececec;
-  font-weight: 840;
+  font-weight: 650;
 }
 
 .orchestration-status-waiting {
@@ -1492,14 +1492,14 @@ select:focus {
 .orchestration-status-waiting span {
   flex: 0 0 auto;
   color: #6f8391;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .orchestration-status-waiting strong {
   min-width: 0;
   overflow: hidden;
   color: #b9c9d4;
-  font-weight: 780;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1592,7 +1592,7 @@ select:focus {
 .orchestration-mini-label text {
   fill: #eafcff;
   font-size: 12px;
-  font-weight: 820;
+  font-weight: 650;
   dominant-baseline: middle;
 }
 
@@ -1603,16 +1603,16 @@ select:focus {
 
 .orchestration-mini-edge-label text {
   fill: #ececec;
-  font-size: 11px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
   dominant-baseline: middle;
 }
 
 .orchestration-message-label {
   padding: 7px 12px 0;
   color: #9fd6df;
-  font-size: 11px;
-  font-weight: 780;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.35;
 }
 
@@ -1639,7 +1639,7 @@ select:focus {
 
 .orchestration-review-line span:first-child {
   color: rgba(243, 245, 246, 0.62);
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .message-time-divider {
@@ -1650,7 +1650,7 @@ select:focus {
   padding: 3px 9px;
   background: rgba(255, 255, 255, 0.12);
   color: rgba(243, 245, 246, 0.62);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -1690,7 +1690,7 @@ select:focus {
   color: white;
   overflow: hidden;
   font-size: 14px;
-  font-weight: 780;
+  font-weight: 650;
   line-height: 1;
   white-space: nowrap;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
@@ -1761,7 +1761,7 @@ select:focus {
 
 .message-mention {
   color: #0b6b39;
-  font-weight: 820;
+  font-weight: 650;
 }
 
 .message-body {
@@ -2182,8 +2182,8 @@ select:focus {
   border: 1px solid rgba(132, 153, 171, 0.18);
   border-radius: 999px;
   padding: 2px 6px;
-  font-size: 10px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1;
 }
 
@@ -2216,7 +2216,6 @@ select:focus {
 
 #send-message {
   width: 40px;
-  min-width: 40px;
   height: 40px;
   padding: 0;
   border-radius: 8px;
@@ -2360,7 +2359,7 @@ select:focus {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .note-scope-tab.active {
@@ -2397,7 +2396,7 @@ select:focus {
   color: #cddae3;
   cursor: pointer;
   font-size: 13px;
-  font-weight: 820;
+  font-weight: 650;
 }
 
 .note-tool-btn:hover,
@@ -2506,15 +2505,15 @@ select:focus {
   overflow: hidden;
   color: #f2fbfc;
   font-size: 13px;
-  font-weight: 820;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .all-note-target-meta {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 720;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .all-notes-editor-shell {
@@ -2602,7 +2601,7 @@ select:focus {
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 740;
+  font-weight: 650;
 }
 
 .mark-menu button:hover,
@@ -2688,7 +2687,7 @@ select:focus {
   overflow: hidden;
   color: white;
   font-size: 14px;
-  font-weight: 780;
+  font-weight: 650;
   line-height: 1;
   white-space: nowrap;
 }
@@ -2696,7 +2695,7 @@ select:focus {
 .mention-avatar {
   width: 22px;
   height: 22px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .mention-avatar-all {
@@ -2795,8 +2794,8 @@ select:focus {
 
 .role-meta-item {
   color: var(--subtle);
-  font-size: 11px;
-  font-weight: 720;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .role-site-control {
@@ -2821,15 +2820,15 @@ select:focus {
   background: rgba(132, 153, 171, 0.08);
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1;
 }
 
 .site-pill::after {
   content: "⌄";
   color: currentColor;
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.72;
 }
 
@@ -2914,8 +2913,8 @@ select:focus {
   border: 1px solid rgba(132, 153, 171, 0.18);
   border-radius: 999px;
   padding: 0 6px;
-  font-size: 10px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1;
 }
 
@@ -2945,7 +2944,7 @@ select:focus {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 740;
+  font-weight: 650;
   text-align: left;
 }
 
@@ -3049,7 +3048,7 @@ select:focus {
   min-width: 54px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
   text-align: center;
 }
 
@@ -3088,8 +3087,8 @@ select:focus {
   border-radius: 999px;
   padding: 0 7px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1;
 }
 
@@ -3217,8 +3216,8 @@ select:focus {
 
 .group-template-search-field span {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
   letter-spacing: 0;
 }
 
@@ -3243,7 +3242,7 @@ select:focus {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 780;
+  font-weight: 650;
 }
 
 .group-template-category-filter:hover,
@@ -3317,7 +3316,7 @@ select:focus {
   min-width: 0;
   overflow: hidden;
   font-size: 14px;
-  font-weight: 820;
+  font-weight: 650;
   line-height: 1.25;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -3325,8 +3324,8 @@ select:focus {
 
 .group-template-role-count {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.2;
 }
 
@@ -3336,8 +3335,8 @@ select:focus {
   border-radius: 999px;
   padding: 2px 7px;
   color: #ececec;
-  font-size: 11px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .group-template-summary {
@@ -3354,7 +3353,7 @@ select:focus {
 .group-template-meta {
   overflow: visible;
   color: #9fb2c1;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   white-space: normal;
 }
@@ -3373,7 +3372,7 @@ select:focus {
   padding: 3px 7px;
   background: rgba(132, 153, 171, 0.08);
   color: #cbd9e3;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.2;
 }
 
@@ -3456,7 +3455,7 @@ select:focus {
   color: var(--muted);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .template-type-tab.active {
@@ -3479,8 +3478,8 @@ select:focus {
   background: rgba(132, 153, 171, 0.08);
   color: var(--muted);
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .template-category-chip:hover,
@@ -3597,7 +3596,7 @@ select:focus {
   background: rgba(5, 8, 12, 0.96);
   color: #dceaf2;
   font-size: 13px;
-  font-weight: 780;
+  font-weight: 650;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3640,7 +3639,7 @@ select:focus {
   border-bottom: 1px solid rgba(132, 153, 171, 0.12);
   color: #d8e6ed;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3659,8 +3658,8 @@ select:focus {
   padding: 1px 6px;
   background: rgba(236, 236, 236, 0.1);
   color: #b9fbf5;
-  font-size: 10px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.35;
 }
 
@@ -3699,7 +3698,7 @@ select:focus {
   margin: 0;
   color: #ececec;
   font-size: 13px;
-  font-weight: 820;
+  font-weight: 650;
 }
 
 .orchestration-task-input-row {
@@ -3717,13 +3716,13 @@ select:focus {
 }
 
 .orchestration-auto {
-  align-self: stretch;
+  align-self: start;
   min-width: 104px;
   padding-inline: 16px;
 }
 
 .orchestration-template-trigger {
-  align-self: stretch;
+  align-self: start;
   min-width: 72px;
   padding-inline: 12px;
 }
@@ -3774,7 +3773,7 @@ select:focus {
   align-items: center;
   color: #8f9cac;
   font-size: 12px;
-  font-weight: 820;
+  font-weight: 650;
 }
 
 .orchestration-template-list {
@@ -3820,8 +3819,8 @@ select:focus {
 .orchestration-template-tags {
   flex: 0 0 auto;
   color: #ececec;
-  font-size: 10px;
-  font-weight: 820;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .orchestration-template-summary,
@@ -3835,13 +3834,13 @@ select:focus {
 
 .orchestration-template-summary {
   color: #aebbc8;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .orchestration-template-structure {
   color: #ececec;
-  font-size: 10px;
-  font-weight: 760;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .modal-backdrop-secondary {
@@ -4039,7 +4038,7 @@ select:focus {
   border-radius: 50%;
   color: #061016;
   font-size: 12px;
-  font-weight: 860;
+  font-weight: 650;
 }
 
 .orchestration-person-avatar.tone-blue {
@@ -4087,7 +4086,7 @@ select:focus {
   flex: 0 0 auto;
   padding: 0 7px;
   cursor: default;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .orchestration-person-site::after {
@@ -4281,7 +4280,7 @@ select:focus {
 .orchestration-auto-role-prompt-row span {
   color: #a9b7c4;
   font-size: 12px;
-  font-weight: 760;
+  font-weight: 650;
 }
 
 .orchestration-auto-role-prompt {
@@ -4303,7 +4302,7 @@ select:focus {
   margin: 0;
   overflow: auto;
   color: #b9f7ef;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
 }
@@ -4544,12 +4543,6 @@ select:focus {
   box-shadow: none;
 }
 
-:root[data-theme="light"] .chat-avatar.role-tone-0 { background: #42b883; }
-:root[data-theme="light"] .chat-avatar.role-tone-1 { background: #4f8df7; }
-:root[data-theme="light"] .chat-avatar.role-tone-2 { background: #f0a23a; }
-:root[data-theme="light"] .chat-avatar.role-tone-3 { background: #8b6be8; }
-:root[data-theme="light"] .chat-avatar.role-tone-4 { background: #e66f8f; }
-:root[data-theme="light"] .chat-avatar.role-tone-5 { background: #33a6a4; }
 
 :root[data-theme="light"] .chat-time,
 :root[data-theme="light"] .summary-line,

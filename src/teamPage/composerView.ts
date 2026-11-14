@@ -100,6 +100,14 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
     }
 
     deps.busyPreviewEl.textContent = thinking.length > 0 ? `Replying: ${thinking.map(roleDisplayName).join(', ')}` : ''
+
+    // Without members nothing can reply, so the whole composer locks (input, attach, send; the header locks the toggle).
+    const locked = !chat || roles.length === 0
+    deps.composerFormEl.classList.toggle('is-locked', locked)
+    deps.messageInputEl.disabled = locked
+    deps.messageInputEl.placeholder = !chat ? 'Select a chat to send' : locked ? 'Add people to start chatting' : 'Message the team'
+    const attach = document.getElementById('attach-file') as HTMLButtonElement | null
+    if (attach) attach.disabled = locked
   }
 
   function renderReferenceDraft(): void {
@@ -234,11 +242,12 @@ export function createComposerView(deps: ComposerViewDependencies): ComposerView
 
     const reference = deps.state.selectedReference
     clearComposerAfterSend(raw, reference)
+    // composer-files.js owns the attached files (globalThis.themisComposerFiles).
+    const attached = globalThis.themisComposerFiles?.take()
     try {
-      // composer-files.js owns the attached files (globalThis.themisComposerFiles).
-      await runCommandWithReconnect(deps, { chat, roles: targetResult.roles, type: 'GROUP_MESSAGE_SEND', payload: { chatId: chat.id, raw, reference, files: globalThis.themisComposerFiles?.list() } })
-      globalThis.themisComposerFiles?.clear()
+      await runCommandWithReconnect(deps, { chat, roles: targetResult.roles, type: 'GROUP_MESSAGE_SEND', payload: { chatId: chat.id, raw, reference, files: attached?.files } })
     } catch (error) {
+      attached?.restore()
       restoreComposerDraft(raw, reference)
       throw error
     }
